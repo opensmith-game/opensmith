@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OpenSmith",
+  "version": "0.1.0",
+  "identifier": "app.opensmith.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "OpenSmith",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "backgroundColor": "#04060c",
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "category": "Music",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "entitlements": "Entitlements.plist"
+    },
+    "resources": {
+      "../../pipeline-ingest/src/": "pipeline-ingest/src/",
+      "../../pipeline-ingest/pyproject.toml": "pipeline-ingest/pyproject.toml",
+      "../../pipeline-ingest/uv.lock": "pipeline-ingest/uv.lock",
+      "../../schema/chart.schema.json": "schema/chart.schema.json",
+      "../demo/": "demo/"
+    }
+  }
+}

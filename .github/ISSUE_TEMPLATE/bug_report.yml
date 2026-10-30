@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead. Screenshots welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Playing a song (note detection, timing, audio)
+        - Importing a song (MP3, Guitar Pro)
+        - Career mode
+        - Settings, tuner, amp
+        - Installing or launching the app
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Air M2, macOS 15.3
+    validations:
+      required: true
+  - type: input
+    id: interface
+    attributes:
+      label: Guitar input
+      placeholder: Real Tone Cable / Focusrite Scarlett 2i2 / none (demo mode)
+  - type: input
+    id: version
+    attributes:
+      label: OpenSmith version or commit
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message or logs
+      description: For an import, the error shown in the imports screen. Please don't attach copyrighted audio.
+      render: text

@@ -1,0 +1,16 @@
+[package]
+name = "opensmith-session"
+description = "OpenSmith game session: backing track, song clock, judging the guitar, UI event stream"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+opensmith-audio.workspace = true
+opensmith-dsp.workspace = true
+opensmith-game.workspace = true
+hound.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

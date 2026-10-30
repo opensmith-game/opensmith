@@ -1,0 +1,16 @@
+[package]
+name = "opensmith-dsp"
+description = "OpenSmith real-time DSP: pitch detection (MPM/YIN), onsets, chord verification, guitar FX chain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+realfft.workspace = true
+hound.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+realfft.workspace = true
+hound.workspace = true

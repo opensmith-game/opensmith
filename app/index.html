@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenSmith</title>
+    <!-- Painted before the stylesheet arrives: no white page, no oversized icons. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #04060c; color: #eef2ff; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="hud" hidden></div>
+
+    <section id="menu" class="screen menu-screen">
+      <div class="menu">
+        <header class="menu-brand">
+          <h1>Open<span>Smith</span></h1>
+          <p id="engineStatus">Mode démo : le jeu joue tout seul, pour voir l’autoroute de notes sans guitare.</p>
+        </header>
+        <button class="menu-resume" data-action="resume-last" hidden>
+          <span class="resume-art" id="resumeArt"></span>
+          <span class="resume-text"><small>Reprendre</small><b id="resumeTitle"></b><span id="resumeMeta"></span></span>
+          <span class="resume-play">▶</span>
+        </button>
+        <nav class="menu-items">
+          <button class="menu-item menu-career" data-action="open-career">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg></span>
+            <span class="menu-text"><b>Carrière</b><small id="menuCareer">Du garage au stade, concert après concert</small></span>
+          </button>
+          <button class="menu-item" data-action="open-trophies">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/></svg></span>
+            <span class="menu-text"><b>Trophées</b><small id="menuTrophies">Sur scène et sur les morceaux</small></span>
+          </button>
+          <button class="menu-item" data-action="open-library">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span>
+            <span class="menu-text"><b>Morceaux</b><small id="menuSongs">Chargement…</small></span>
+          </button>
+          <button class="menu-item menu-import" data-action="open-imports">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg></span>
+            <span class="menu-text"><b>Importer un morceau</b><small>MP3, Guitar Pro · ou glisse-les sur la fenêtre</small></span>
+          </button>
+          <button class="menu-item" data-action="open-riff-library">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></span>
+            <span class="menu-text"><b>Loop Trainer</b><small>Un passage en boucle, au ralenti</small></span>
+          </button>
+          <button class="menu-item live-only" data-action="open-amp">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="14" r="3.5"/><path d="M7 7.5h.01M10 7.5h.01M14 7.5h3"/></svg></span>
+            <span class="menu-text"><b>Jouer librement</b><small>L’ampli, sans morceau</small></span>
+          </button>
+          <button class="menu-item live-only" data-action="open-tuner">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 18a9 9 0 0 1 16 0"/><path d="M12 18l4-7"/><circle cx="12" cy="18" r="1.5"/></svg></span>
+            <span class="menu-text"><b>Accordeur</b><small>Chaque corde au cent près</small></span>
+          </button>
+
+          <button class="menu-item" data-action="open-settings">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+            <span class="menu-text"><b>Réglages</b><small>Guitare, latence, jeu</small></span>
+          </button>
+        </nav>
+        <p class="menu-foot">Appuie sur <kbd>?</kbd> pour voir les raccourcis clavier.</p>
+      </div>
+    </section>
+
+    <section id="library" class="screen" hidden></section>
+
+    <section id="career" class="screen career-screen" hidden></section>
+
+    <section id="interlude" class="screen dim" hidden>
+      <div class="panel small interlude-panel">
+        <small id="interludeVenue"></small>
+        <h2 id="interludeTitle"></h2>
+        <div class="gig-crowd"><i id="interludeCrowd"></i></div>
+        <p id="interludeCrowdText"></p>
+        <p class="interlude-next" id="interludeNext"></p>
+        <div class="buttons">
+          <button class="action primary" data-action="gig-next">Morceau suivant <span id="interludeCount"></span></button>
+          <button class="action" data-action="gig-quit">Quitter le concert</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="encore" class="screen dim" hidden>
+      <div class="panel small interlude-panel encore-panel">
+        <small id="encoreVenue"></small>
+        <h2>Rappel !</h2>
+        <div class="gig-crowd"><i id="encoreCrowd"></i></div>
+        <p id="encoreText"></p>
+        <div class="encore-songs" id="encoreSongs"></div>
+        <div class="buttons">
+          <button class="action" data-action="encore-skip">Saluer et quitter la scène</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="trophies" class="screen" hidden></section>
+
+    <section id="importsScreen" class="screen" hidden>
+      <div class="panel imports-panel">
+        <header class="screen-head">
+          <button class="action small" data-action="menu">← Menu</button>
+          <h2>Importer un morceau</h2>
+        </header>
+        <ol class="pipeline pipeline-legend">
+          <li><i>1</i><b>Séparation des pistes</b><small>Demucs htdemucs_6s : la guitare seule, et le reste en accompagnement</small></li>
+          <li><i>2</i><b>Tempo et notes</b><small>librosa pour la grille, Basic Pitch pour les notes</small></li>
+          <li><i>3</i><b>Doigté du manche</b><small>Viterbi : la corde et la case la plus naturelle pour chaque note</small></li>
+          <li><i>4</i><b>Bibliothèque</b><small>niveaux de difficulté, sections, prêt à jouer</small></li>
+        </ol>
+        <p class="help demo-only import-demo">Le navigateur n’a pas accès au pipeline : l’import (glisser-déposer, MP3, .gp) tourne dans l’app de bureau.</p>
+        <section class="imports" id="imports"></section>
+      </div>
+    </section>
+
+    <section id="settingsScreen" class="screen dim" hidden>
+      <div class="panel settings-panel">
+        <header class="screen-head">
+          <button class="action small" data-action="menu">← Menu</button>
+          <h2>Réglages</h2>
+          <nav class="tabs" id="settingsTabs">
+            <button class="tab" data-tab="audio">Audio &amp; guitare</button>
+            <button class="tab" data-tab="latency">Latence &amp; calibrage</button>
+            <button class="tab" data-tab="game">Jeu</button>
+          </nav>
+        </header>
+        <div id="guitarSettings" class="tab-pane" hidden></div>
+        <form class="settings tab-pane" id="settings" onsubmit="return false" hidden>
+          <label>Langue · Language
+            <select name="lang"></select>
+          </label>
+          <label class="wide"><input type="checkbox" name="invertStrings" /> Cordes inversées : Mi grave en bas, comme une tablature</label>
+          <label class="wide"><input type="checkbox" name="masterMode" /> Mode Maître : les notes des phrases maîtrisées s’effacent avant d’arriver, à jouer de mémoire</label>
+          <label>Décor (hors carrière)
+            <select name="scenery"></select>
+          </label>
+          <label>Guitare (achetées en carrière)
+            <select name="guitar"></select>
+          </label>
+          <label>Vitesse des notes
+            <select name="speed">
+              <option value="9">Lente</option>
+              <option value="12">Normale</option>
+              <option value="16">Rapide</option>
+            </select>
+          </label>
+          <label>Niveau de départ
+            <select name="startLevel">
+              <option value="0">1 · débutant</option>
+              <option value="1">2</option>
+              <option value="2">3</option>
+              <option value="3">4</option>
+              <option value="4">5 · complet</option>
+            </select>
+          </label>
+          <label class="wide demo-only">Réussite du joueur automatique
+            <input type="range" name="skill" min="0.3" max="1" step="0.01" />
+            <output id="skillOut"></output>
+          </label>
+        </form>
+        <div class="buttons">
+          <button class="action live-only" data-action="open-welcome">Guide de démarrage</button>
+          <button class="action primary" data-action="menu">Terminé</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tuner" class="screen dim" hidden></section>
+    <section id="amp" class="screen dim" hidden></section>
+    <section id="riff" class="screen dim" hidden></section>
+
+    <section id="pause" class="screen dim" hidden>
+      <div class="panel pause-panel">
+        <header class="pause-head">
+          <div id="pauseCover"></div>
+          <div>
+            <small>Pause</small>
+            <h2 id="pauseTitle"></h2>
+            <p id="pauseMeta"></p>
+          </div>
+        </header>
+        <div class="pause-progress">
+          <div class="pause-bar"><i id="pauseBar"></i></div>
+          <span id="pauseWhere"></span>
+        </div>
+        <dl class="pause-score" id="pauseScore"></dl>
+        <p class="pause-gig" id="pauseGig" hidden></p>
+        <form class="quick" id="quick" onsubmit="return false">
+          <h3>Réglages rapides</h3>
+          <label class="row">Accompagnement <input type="range" min="0" max="1" step="0.01" name="backingVolume" /><output data-out="backingVolume"></output></label>
+          <label class="row live-only" data-el="monitorRow">Ta guitare <input type="range" min="0" max="1" step="0.01" name="monitorVolume" /><output data-out="monitorVolume"></output></label>
+          <div class="row live-only"><span>Ampli</span><div class="segmented" id="quickAmp"></div></div>
+          <div class="row"><span>Vitesse des notes</span><div class="segmented" id="quickSpeed"></div></div>
+          <label class="row quick-level" data-el="levelRow">Difficulté
+            <select name="difficulty">
+              <option value="auto">Auto · suit ton jeu</option>
+              <option value="0">1 · Débutant</option>
+              <option value="1">2 · Facile</option>
+              <option value="2">3 · Moyen</option>
+              <option value="3">4 · Difficile</option>
+              <option value="4">5 · Toutes les notes</option>
+            </select>
+          </label>
+          <p class="quick-note" id="levelNote" hidden></p>
+        </form>
+        <div class="buttons">
+          <button class="action primary" data-action="resume">Reprendre</button>
+          <button class="action" data-action="restart">Recommencer</button>
+          <button class="action" data-action="riff">Loop Trainer</button>
+          <button class="action riff-only" data-action="riff-exit">Quitter le Loop Trainer</button>
+          <button class="action" data-action="library">Morceaux</button>
+          <button class="action" data-action="pause-menu">Menu principal</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="screen dim" hidden>
+      <div class="panel results-panel">
+        <header class="results-head">
+          <div id="resultsCover"></div>
+          <div>
+            <h2 id="resultsTitle">Résultats</h2>
+            <p id="resultsArtist"></p>
+          </div>
+        </header>
+        <div class="grade" id="grade"></div>
+        <p class="verdict" id="verdict"></p>
+        <p class="records" id="records"></p>
+        <div class="phrase-strip" id="phraseStrip"></div>
+        <dl class="stats" id="stats"></dl>
+        <div class="buttons">
+          <button class="action primary" data-action="restart">Rejouer</button>
+          <button class="action" data-action="riff-weakest">Travailler un passage</button>
+          <button class="action" data-action="library">Morceaux</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="welcome" class="screen dim welcome" hidden></section>
+
+    <section id="help" class="screen dim help-sheet" hidden>
+      <div class="panel help-panel">
+        <h2>Raccourcis clavier</h2>
+        <div class="help-groups">
+          <section>
+            <h3>En jeu</h3>
+            <dl>
+              <dt><kbd>Espace</kbd></dt><dd>Pause, reprendre</dd>
+              <dt><kbd>R</kbd></dt><dd>Recommencer</dd>
+              <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Reculer, avancer de 5 s</dd>
+              <dt><kbd>L</kbd></dt><dd>Loop Trainer</dd>
+              <dt><kbd>I</kbd></dt><dd>Inverser les cordes</dd>
+              <dt><kbd>Échap</kbd></dt><dd>Pause, puis retour aux morceaux</dd>
+            </dl>
+          </section>
+          <section>
+            <h3>Loop Trainer</h3>
+            <dl>
+              <dt><kbd>Entrée ↵</kbd></dt><dd>Lancer le passage choisi</dd>
+              <dt>Maj + clic</dt><dd>Prendre plusieurs phrases</dd>
+              <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Plus vite, moins vite, en jeu</dd>
+              <dt><kbd>R</kbd></dt><dd>Recommencer la passe</dd>
+            </dl>
+          </section>
+          <section>
+            <h3>Morceaux</h3>
+            <dl>
+              <dt><kbd>/</kbd></dt><dd>Chercher</dd>
+              <dt><kbd>Entrée ↵</kbd></dt><dd>Jouer le morceau choisi</dd>
+              <dt><kbd>Échap</kbd></dt><dd>Fermer la fiche, puis le menu</dd>
+            </dl>
+          </section>
+          <section>
+            <h3>Partout</h3>
+            <dl>
+              <dt><kbd>?</kbd></dt><dd>Cette aide</dd>
+              <dt><kbd>Échap</kbd></dt><dd>Revenir en arrière</dd>
+              <dt><kbd>Espace</kbd></dt><dd>À l’accordeur : jouer, une fois accordé</dd>
+            </dl>
+          </section>
+        </div>
+        <div class="buttons">
+          <button class="action primary" data-action="close-help">Fermer</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="loading" class="loading" hidden>
+      <div class="loading-card">
+        <span id="loadingArt"></span>
+        <div><small>Chargement</small><b id="loadingTitle"></b></div>
+        <i class="spinner"></i>
+      </div>
+    </div>
+
+    <div id="hwHud" class="hw-hud" hidden></div>
+
+    <div id="trophyToasts" class="trophy-toasts" aria-live="polite"></div>
+
+    <div id="dropOverlay" class="drop-overlay" hidden>
+      <div><b>Lâche pour convertir</b><span>MP3, WAV, FLAC, Guitar Pro… ou tout un dossier de musique</span></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,1629 @@
+{
+ "format": "opensmith-chart",
+ "version": 1,
+ "meta": {
+  "title": "Demo Rock",
+  "artist": "OpenSmith Synth",
+  "album": null,
+  "year": null,
+  "duration": 37.9091,
+  "source": {
+   "kind": "audio",
+   "file": "demo_rock.mp3"
+  },
+  "generator": "opensmith-ingest 0.1.0"
+ },
+ "audio": {
+  "backing": "backing_track_no_guitar.wav",
+  "guitar": "isolated_guitar.wav",
+  "mix": null,
+  "offset": 0.0
+ },
+ "arrangement": {
+  "name": "Lead",
+  "type": "lead",
+  "tuning": {
+   "name": "E Standard",
+   "strings": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+   ]
+  },
+  "capo": 0,
+  "maxDifficulty": 4
+ },
+ "tempo": {
+  "bpm": 109.99,
+  "timeSignature": [
+   4,
+   4
+  ]
+ },
+ "beats": [
+  {
+   "time": 0.4577
+  },
+  {
+   "time": 1.0032,
+   "bar": 1
+  },
+  {
+   "time": 1.549
+  },
+  {
+   "time": 2.0946
+  },
+  {
+   "time": 2.6402
+  },
+  {
+   "time": 3.1859,
+   "bar": 2
+  },
+  {
+   "time": 3.7313
+  },
+  {
+   "time": 4.2772
+  },
+  {
+   "time": 4.8226
+  },
+  {
+   "time": 5.3683,
+   "bar": 3
+  },
+  {
+   "time": 5.9137
+  },
+  {
+   "time": 6.4593
+  },
+  {
+   "time": 7.0045
+  },
+  {
+   "time": 7.5503,
+   "bar": 4
+  },
+  {
+   "time": 8.0953
+  },
+  {
+   "time": 8.6412
+  },
+  {
+   "time": 9.1861
+  },
+  {
+   "time": 9.7318,
+   "bar": 5
+  },
+  {
+   "time": 10.2769
+  },
+  {
+   "time": 10.8226
+  },
+  {
+   "time": 11.3679
+  },
+  {
+   "time": 11.9135,
+   "bar": 6
+  },
+  {
+   "time": 12.4586
+  },
+  {
+   "time": 13.0046
+  },
+  {
+   "time": 13.5496
+  },
+  {
+   "time": 14.0955,
+   "bar": 7
+  },
+  {
+   "time": 14.6407
+  },
+  {
+   "time": 15.1864
+  },
+  {
+   "time": 15.7316
+  },
+  {
+   "time": 16.2775,
+   "bar": 8
+  },
+  {
+   "time": 16.8228
+  },
+  {
+   "time": 17.3687
+  },
+  {
+   "time": 17.9138
+  },
+  {
+   "time": 18.4596,
+   "bar": 9
+  },
+  {
+   "time": 19.0048
+  },
+  {
+   "time": 19.5506
+  },
+  {
+   "time": 20.0959
+  },
+  {
+   "time": 20.6416,
+   "bar": 10
+  },
+  {
+   "time": 21.1865
+  },
+  {
+   "time": 21.7324
+  },
+  {
+   "time": 22.2773
+  },
+  {
+   "time": 22.8231,
+   "bar": 11
+  },
+  {
+   "time": 23.3683
+  },
+  {
+   "time": 23.914
+  },
+  {
+   "time": 24.459
+  },
+  {
+   "time": 25.0048,
+   "bar": 12
+  },
+  {
+   "time": 25.5498
+  },
+  {
+   "time": 26.0956
+  },
+  {
+   "time": 26.6406
+  },
+  {
+   "time": 27.1865,
+   "bar": 13
+  },
+  {
+   "time": 27.7316
+  },
+  {
+   "time": 28.2772
+  },
+  {
+   "time": 28.8223
+  },
+  {
+   "time": 29.368,
+   "bar": 14
+  },
+  {
+   "time": 29.9132
+  },
+  {
+   "time": 30.459
+  },
+  {
+   "time": 31.0042
+  },
+  {
+   "time": 31.5499,
+   "bar": 15
+  },
+  {
+   "time": 32.0951
+  },
+  {
+   "time": 32.6409
+  },
+  {
+   "time": 33.1862
+  },
+  {
+   "time": 33.7319,
+   "bar": 16
+  },
+  {
+   "time": 34.2774
+  },
+  {
+   "time": 34.8229
+  },
+  {
+   "time": 35.3687
+  },
+  {
+   "time": 35.9142,
+   "bar": 17
+  },
+  {
+   "time": 36.4596
+  },
+  {
+   "time": 37.0051
+  },
+  {
+   "time": 37.5506
+  }
+ ],
+ "sections": [
+  {
+   "name": "Section 1",
+   "start": 0.0,
+   "end": 1.0032
+  },
+  {
+   "name": "Section 2",
+   "start": 1.0032,
+   "end": 35.9142
+  },
+  {
+   "name": "Section 3",
+   "start": 35.9142,
+   "end": 37.9091
+  }
+ ],
+ "phrases": [
+  {
+   "name": "rest",
+   "start": 0.0,
+   "end": 1.0032,
+   "maxDifficulty": 0
+  },
+  {
+   "name": "A",
+   "start": 1.0032,
+   "end": 9.7318,
+   "maxDifficulty": 4
+  },
+  {
+   "name": "B",
+   "start": 9.7318,
+   "end": 18.4596,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "A",
+   "start": 18.4596,
+   "end": 27.1865,
+   "maxDifficulty": 4
+  },
+  {
+   "name": "B",
+   "start": 27.1865,
+   "end": 35.9142,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "rest",
+   "start": 35.9142,
+   "end": 37.9091,
+   "maxDifficulty": 0
+  }
+ ],
+ "chordTemplates": [
+  {
+   "name": "G5",
+   "frets": [
+    3,
+    -1,
+    0,
+    -1,
+    3,
+    -1
+   ],
+   "fingers": [
+    2,
+    -1,
+    0,
+    -1,
+    3,
+    -1
+   ]
+  },
+  {
+   "name": "A5",
+   "frets": [
+    -1,
+    0,
+    2,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    0,
+    1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "A",
+   "frets": [
+    -1,
+    -1,
+    -1,
+    2,
+    -1,
+    5
+   ],
+   "fingers": [
+    -1,
+    -1,
+    -1,
+    1,
+    -1,
+    4
+   ]
+  },
+  {
+   "name": "E5",
+   "frets": [
+    0,
+    2,
+    2,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    0,
+    1,
+    1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "G5",
+   "frets": [
+    3,
+    5,
+    -1,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    2,
+    4,
+    -1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "A5/E",
+   "frets": [
+    -1,
+    -1,
+    2,
+    2,
+    5,
+    -1
+   ],
+   "fingers": [
+    -1,
+    -1,
+    1,
+    1,
+    4,
+    -1
+   ]
+  },
+  {
+   "name": "E5/B",
+   "frets": [
+    -1,
+    2,
+    2,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    1,
+    1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "G5",
+   "frets": [
+    3,
+    5,
+    5,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    2,
+    4,
+    4,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "C5",
+   "frets": [
+    -1,
+    3,
+    5,
+    5,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    2,
+    4,
+    4,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "D5",
+   "frets": [
+    -1,
+    -1,
+    0,
+    2,
+    3,
+    -1
+   ],
+   "fingers": [
+    -1,
+    -1,
+    0,
+    1,
+    2,
+    -1
+   ]
+  },
+  {
+   "name": "E5",
+   "frets": [
+    0,
+    2,
+    -1,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    0,
+    1,
+    -1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "G",
+   "frets": [
+    3,
+    -1,
+    0,
+    4,
+    -1,
+    -1
+   ],
+   "fingers": [
+    2,
+    -1,
+    0,
+    3,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "A5",
+   "frets": [
+    -1,
+    0,
+    2,
+    2,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    0,
+    1,
+    1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "D",
+   "frets": [
+    -1,
+    -1,
+    0,
+    -1,
+    -1,
+    14
+   ],
+   "fingers": [
+    -1,
+    -1,
+    0,
+    -1,
+    -1,
+    4
+   ]
+  },
+  {
+   "name": "C5",
+   "frets": [
+    8,
+    10,
+    10,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    2,
+    4,
+    4,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "D5",
+   "frets": [
+    10,
+    -1,
+    7,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    4,
+    -1,
+    1,
+    -1,
+    -1,
+    -1
+   ]
+  }
+ ],
+ "notes": [
+  {
+   "time": 1.0032,
+   "string": 1,
+   "fret": 2,
+   "sustain": 0.6822,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 1.0681,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    4,
+    4
+   ]
+  },
+  {
+   "time": 2.0946,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9094,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 3.1859,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.2727,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 3.4586,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.2727,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 4.0043,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 4.2772,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.4622,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 4.8226,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3638,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 5.3683,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.5454,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 6.4593,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.7775,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 6.5054,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.772,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 7.5503,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.2725,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 7.8228,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.2725,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 8.0953,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.2729,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 8.3682,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.2729,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 8.6412,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.4546,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 9.1861,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3637,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 9.7318,
+   "string": 1,
+   "fret": 2,
+   "sustain": 0.5452,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 10.8226,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.8181,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 11.9135,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3195,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 12.1861,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 12.4586,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 12.7316,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.273,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 13.0046,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.4707,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 13.5496,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3204,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 14.0955,
+   "string": 1,
+   "fret": 3,
+   "sustain": 0.8181,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 15.1864,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.8181,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 16.2775,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.2727,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 16.5502,
+   "string": 3,
+   "fret": 4,
+   "sustain": 0.2727,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 16.8228,
+   "string": 3,
+   "fret": 5,
+   "sustain": 0.2729,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 17.0958,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.2729,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 17.3687,
+   "string": 5,
+   "fret": 0,
+   "sustain": 0.5451,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 17.9138,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.3639,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 18.4596,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.604,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 19.5506,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.8181,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 20.6416,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.2724,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 20.914,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3102,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 21.1865,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 21.4594,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.273,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 21.7324,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.4568,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 22.2773,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3639,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 22.8231,
+   "string": 1,
+   "fret": 2,
+   "sustain": 0.5452,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 23.6411,
+   "string": 0,
+   "fret": 3,
+   "sustain": 0.2729,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 23.7321,
+   "string": 1,
+   "fret": 5,
+   "sustain": 0.0,
+   "levels": [
+    4,
+    4
+   ]
+  },
+  {
+   "time": 23.914,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.8179,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 25.0048,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3204,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 25.2773,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.2725,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 25.5498,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 25.8227,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.2729,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 26.0956,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.4499,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 26.6406,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3639,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 27.1865,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.545,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 28.2772,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.8179,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 29.368,
+   "string": 1,
+   "fret": 7,
+   "sustain": 0.3634,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 29.6406,
+   "string": 1,
+   "fret": 10,
+   "sustain": 0.2726,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 29.9132,
+   "string": 2,
+   "fret": 7,
+   "sustain": 0.2729,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 30.1861,
+   "string": 1,
+   "fret": 10,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 30.459,
+   "string": 1,
+   "fret": 7,
+   "sustain": 0.4776,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 31.5499,
+   "string": 0,
+   "fret": 8,
+   "sustain": 0.8625,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 32.6409,
+   "string": 0,
+   "fret": 10,
+   "sustain": 0.8182,
+   "levels": [
+    0,
+    0
+   ]
+  },
+  {
+   "time": 33.7319,
+   "string": 2,
+   "fret": 7,
+   "sustain": 0.2728,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 34.0047,
+   "string": 2,
+   "fret": 9,
+   "sustain": 0.2728,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 34.2774,
+   "string": 2,
+   "fret": 10,
+   "sustain": 0.2727,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 34.5501,
+   "string": 3,
+   "fret": 7,
+   "sustain": 0.2727,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 34.8229,
+   "string": 3,
+   "fret": 9,
+   "sustain": 0.5458,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 35.3687,
+   "string": 3,
+   "fret": 7,
+   "sustain": 0.3637,
+   "levels": [
+    2,
+    4
+   ]
+  }
+ ],
+ "chords": [
+  {
+   "time": 1.8218,
+   "template": 0,
+   "sustain": 0.2728,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 2.0946,
+   "template": 1,
+   "sustain": 0.9094,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 3.7313,
+   "template": 2,
+   "sustain": 0.2729,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 5.3683,
+   "template": 3,
+   "sustain": 0.5454,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 6.1865,
+   "template": 4,
+   "sustain": 0.2728,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 6.4593,
+   "template": 5,
+   "sustain": 0.7775,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 9.7318,
+   "template": 6,
+   "sustain": 0.5452,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 10.5498,
+   "template": 7,
+   "sustain": 0.2728,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 10.8226,
+   "template": 1,
+   "sustain": 0.8181,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 14.0955,
+   "template": 8,
+   "sustain": 0.8181,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 15.1864,
+   "template": 9,
+   "sustain": 0.8181,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 18.4596,
+   "template": 3,
+   "sustain": 0.604,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 19.2777,
+   "template": 4,
+   "sustain": 0.2729,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 19.5506,
+   "template": 1,
+   "sustain": 0.8181,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 22.8231,
+   "template": 6,
+   "sustain": 0.5452,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 23.914,
+   "template": 1,
+   "sustain": 0.8179,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 27.1865,
+   "template": 10,
+   "sustain": 0.545,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 28.0044,
+   "template": 11,
+   "sustain": 0.2728,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 28.2772,
+   "template": 12,
+   "sustain": 0.8179,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 31.0042,
+   "template": 13,
+   "sustain": 0.3638,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 31.5499,
+   "template": 14,
+   "sustain": 0.8625,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 32.6409,
+   "template": 15,
+   "sustain": 0.8182,
+   "levels": [
+    1,
+    4
+   ]
+  }
+ ],
+ "anchors": [
+  {
+   "time": 1.0032,
+   "fret": 2,
+   "width": 4
+  },
+  {
+   "time": 29.368,
+   "fret": 7,
+   "width": 4
+  },
+  {
+   "time": 31.0042,
+   "fret": 11,
+   "width": 4
+  },
+  {
+   "time": 31.5499,
+   "fret": 7,
+   "width": 4
+  }
+ ],
+ "handShapes": [
+  {
+   "template": 0,
+   "start": 1.8218,
+   "end": 2.0946
+  },
+  {
+   "template": 1,
+   "start": 2.0946,
+   "end": 3.1859
+  },
+  {
+   "template": 2,
+   "start": 3.7313,
+   "end": 4.0043
+  },
+  {
+   "template": 3,
+   "start": 5.3683,
+   "end": 6.1865
+  },
+  {
+   "template": 4,
+   "start": 6.1865,
+   "end": 6.4593
+  },
+  {
+   "template": 5,
+   "start": 6.4593,
+   "end": 6.5054
+  },
+  {
+   "template": 6,
+   "start": 9.7318,
+   "end": 10.5498
+  },
+  {
+   "template": 7,
+   "start": 10.5498,
+   "end": 10.8226
+  },
+  {
+   "template": 1,
+   "start": 10.8226,
+   "end": 11.9135
+  },
+  {
+   "template": 8,
+   "start": 14.0955,
+   "end": 15.1864
+  },
+  {
+   "template": 9,
+   "start": 15.1864,
+   "end": 16.2775
+  },
+  {
+   "template": 3,
+   "start": 18.4596,
+   "end": 19.2777
+  },
+  {
+   "template": 4,
+   "start": 19.2777,
+   "end": 19.5506
+  },
+  {
+   "template": 1,
+   "start": 19.5506,
+   "end": 20.6416
+  },
+  {
+   "template": 6,
+   "start": 22.8231,
+   "end": 23.6411
+  },
+  {
+   "template": 1,
+   "start": 23.914,
+   "end": 25.0048
+  },
+  {
+   "template": 10,
+   "start": 27.1865,
+   "end": 28.0044
+  },
+  {
+   "template": 11,
+   "start": 28.0044,
+   "end": 28.2772
+  },
+  {
+   "template": 12,
+   "start": 28.2772,
+   "end": 29.368
+  },
+  {
+   "template": 13,
+   "start": 31.0042,
+   "end": 31.5499
+  },
+  {
+   "template": 14,
+   "start": 31.5499,
+   "end": 32.6409
+  },
+  {
+   "template": 15,
+   "start": 32.6409,
+   "end": 33.7319
+  }
+ ]
+}

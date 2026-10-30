@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Rust engine (engine-rt)
+    # CoreAudio: the engine is macOS-only. Tests that need real audio devices are #[ignore]d.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  app-backend:
+    name: App backend (app/src-tauri)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - run: cargo test
+        working-directory: app/src-tauri
+
+  app-frontend:
+    name: App frontend (app)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npx vitest run
+
+  pipeline:
+    name: Song pipeline (pipeline-ingest, fast tests)
+    # Basic Pitch and PyTorch on Apple Silicon, as on the players' Macs.
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: pipeline-ingest
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install ffmpeg
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline-ingest/uv.lock
+      - run: uv sync --frozen
+      # The end-to-end runs (stem separation, transcription: `-m slow`) stay local.
+      - run: uv run pytest

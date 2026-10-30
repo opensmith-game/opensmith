@@ -1,0 +1,20 @@
+name: Feature request
+description: An idea for the game, the importer or the app
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The situation and what's missing, as a player or a contributor.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else
+      description: Other games or tools that do it well, links, sketches.

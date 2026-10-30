@@ -1,0 +1,13 @@
+[package]
+name = "opensmith-audio"
+description = "OpenSmith CoreAudio engine: device discovery (Real Tone Cable), low-latency duplex streaming"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+opensmith-dsp.workspace = true
+cpal.workspace = true
+rtrb.workspace = true
+thiserror.workspace = true

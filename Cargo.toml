@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+members = ["engine-rt/dsp", "engine-rt/audio", "engine-rt/diag", "engine-rt/game", "engine-rt/session"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+opensmith-dsp = { path = "engine-rt/dsp" }
+opensmith-audio = { path = "engine-rt/audio" }
+opensmith-game = { path = "engine-rt/game" }
+opensmith-session = { path = "engine-rt/session" }
+cpal = "0.18"
+rtrb = "0.4"
+realfft = "3.5"
+hound = "3.5"
+clap = { version = "4.6", features = ["derive"] }
+anyhow = "1"
+thiserror = "2"
+ctrlc = "3.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# DSP code is meaningless unoptimized: keep dev/test builds fast but with debug assertions.
+[profile.dev]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

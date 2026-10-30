@@ -1,0 +1,10 @@
+/**
+ * English for the interface, keyed by the French text the code is written in (see `i18n.ts`).
+ * One file per part of the app.
+ */
+import { CAREER } from './career';
+import { CAREER_SCREEN } from './career-screen';
+import { MAIN } from './main';
+import { SCREENS } from './screens';
+
+export const EN: Record<string, string> = { ...MAIN, ...SCREENS, ...CAREER, ...CAREER_SCREEN };

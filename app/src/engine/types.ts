@@ -1,0 +1,82 @@
+import type { CareerStore } from '../career/career';
+import type { Chart } from '../chart';
+import type { GameEvent } from '../game/types';
+import type { ProgressStore } from '../progress';
+
+export interface SongEntry {
+  /** Chart path inside the library, e.g. "demo/chart/song_chart.json". */
+  id: string;
+  title: string;
+  artist: string;
+  duration: number;
+  tuning: string;
+  arrangement: string;
+  notes: number;
+  chords: number;
+  /** Library path of the song's picture, if any. */
+  cover?: string | null;
+  album?: string | null;
+  year?: number | null;
+  /** Where the notes come from: "audio" (transcribed), "guitarpro", "synth", a plugin's… */
+  source?: string;
+  /** A backing track to play along with. */
+  hasAudio?: boolean;
+  maxDifficulty?: number;
+  /** Phrase names in order of first appearance (rests aside). */
+  phrases?: string[];
+  /** Notes and chords played at each level 0..maxDifficulty (how sparse the easy levels are). */
+  levelNotes?: number[];
+  /** The part of the song (section name, as written) where each of `phrases` is first played. */
+  phraseSections?: string[];
+}
+
+export interface Frame {
+  /** Song time heard now, seconds (negative during the count-in). */
+  time: number;
+  playing: boolean;
+  events: GameEvent[];
+  /** Loudest guitar sample since the last frame (live mode), linear. */
+  peak: number;
+}
+
+/**
+ * Loop Trainer loop, song seconds: the music loops over `start..end` and the notes from `from`
+ * to `to` are judged again on every pass (`start` a little before `from` to get ready, `end`
+ * long enough after `to` for the last notes to be judged).
+ */
+export interface RiffLoop {
+  start: number;
+  end: number;
+  from: number;
+  to: number;
+}
+
+/** Plays a song and judges the player: the native engine (Tauri) or the browser demo. */
+export interface Engine {
+  readonly kind: 'demo' | 'live';
+  /** Where the career mode is saved. */
+  readonly career: CareerStore;
+  readonly playing: boolean;
+  /** Called from a user gesture: lets the browser start audio. */
+  unlock(): void;
+  /** Where scores and learnt levels are kept. */
+  readonly progress: ProgressStore;
+  library(): Promise<SongEntry[]>;
+  /** `levels`: the level each phrase (by name) starts at, from earlier sessions. */
+  load(id: string, levels?: Record<string, number>): Promise<Chart>;
+  play(): void;
+  pause(): void;
+  /** Moves to `time` and starts judging from there. */
+  seek(time: number): void;
+  /** Playback speed (1 = as recorded); the native engine keeps the pitch. */
+  setSpeed(rate: number): void;
+  /** Loop Trainer: plays the loop from its start, a 'pass' event each time round; null: off. */
+  setRiff(riff: RiffLoop | null): void;
+  /** Difficulty changed during the song (pause menu), from the next phrase: dynamic from the
+   * levels learnt, or every phrase at `level`. */
+  setDifficulty(dynamic: boolean, level: number): void;
+  /** State at `nowMs` (performance.now()) and the game events since the last frame. */
+  frame(nowMs: number): Frame;
+  /** An image URL for the song's picture, null without one. */
+  coverUrl(song: SongEntry): Promise<string | null>;
+}

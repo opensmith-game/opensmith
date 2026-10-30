@@ -1,0 +1,21 @@
+/target
+**/*.rs.bk
+.DS_Store
+
+# Python (pipeline-ingest)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node / Tauri (app)
+node_modules/
+dist/
+
+# Generated audio & local data
+/out/
+*.local.wav
+
+# Tauri (app/src-tauri is its own Cargo workspace)
+app/src-tauri/target/
+app/src-tauri/gen/

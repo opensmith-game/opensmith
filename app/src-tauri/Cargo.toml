@@ -1,0 +1,38 @@
+[package]
+name = "opensmith-app"
+description = "OpenSmith desktop app: Tauri shell around the game session"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "GPL-3.0-or-later"
+
+# Its own workspace: Tauri builds need the frontend, the engine workspace must not.
+[workspace]
+
+[lib]
+name = "opensmith_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+opensmith-audio = { path = "../../engine-rt/audio" }
+opensmith-dsp = { path = "../../engine-rt/dsp" }
+opensmith-game = { path = "../../engine-rt/game" }
+opensmith-session = { path = "../../engine-rt/session" }
+
+[profile.dev]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

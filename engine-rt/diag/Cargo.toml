@@ -1,0 +1,19 @@
+[package]
+name = "opensmith-diag"
+description = "OpenSmith diagnostic CLI: devices, live duplex run, self-test, benchmarks, WAV rendering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "opensmith-diag"
+path = "src/main.rs"
+
+[dependencies]
+opensmith-dsp.workspace = true
+opensmith-audio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+ctrlc.workspace = true
+hound.workspace = true

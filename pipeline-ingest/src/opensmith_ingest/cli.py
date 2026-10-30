@@ -1,0 +1,241 @@
+"""`opensmith-ingest` command line."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from collections.abc import Callable
+from importlib.metadata import entry_points
+from pathlib import Path
+
+from .fingering import Tuning
+from .tunings import by_name
+
+TUNINGS = {
+    "standard": "E Standard",
+    "eb": "Eb Standard",
+    "dropd": "Drop D",
+    "d": "D Standard",
+    "dropc#": "Drop C#",
+    "dropc": "Drop C",
+    "c": "C Standard",
+    "dropb": "Drop B",
+}
+
+Emit = Callable[..., None]
+
+# Commands added by other packages: an entry point of this group is a function given the
+# subcommands and the help of --progress-json; it adds its command and returns what runs it,
+# called with the parsed arguments and the JSON sink (None on a terminal). Its `formats`
+# attribute names the file extensions the command imports: the app sends it those files.
+PLUGINS = "opensmith_ingest.commands"
+
+
+def _tuning(args: argparse.Namespace) -> Tuning | None:
+    """None lets the pipeline detect the tuning from the notes."""
+    if args.tuning == "auto":
+        return None
+    t = by_name(TUNINGS[args.tuning])
+    return Tuning(t.strings, t.name, args.capo) if args.capo else t
+
+
+class JsonLines:
+    """Machine-readable output for the app: one JSON object per line on stdout. Anything else
+    printed while working (libraries included) is moved to stderr."""
+
+    def __init__(self) -> None:
+        sys.stdout.flush()
+        self._out = os.fdopen(os.dup(1), "w", buffering=1, encoding="utf-8")
+        os.dup2(2, 1)
+
+    def __call__(self, **fields) -> None:
+        self._out.write(json.dumps(fields, ensure_ascii=False) + "\n")
+        self._out.flush()
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="opensmith-ingest", description="Songs and tabs → OpenSmith game charts")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    machine = "report progress as JSON lines on stdout (used by the app)"
+
+    audio = sub.add_parser("audio", help="MP3/WAV/FLAC → stems + transcription + chart")
+    audio.add_argument("song", type=Path)
+    audio.add_argument("-o", "--out", type=Path)
+    audio.add_argument("--title", help="default: the file's tags, else its name")
+    audio.add_argument("--artist", help="default: the file's tags, else its name")
+    audio.add_argument("--device", choices=["mps", "cpu"])
+    audio.add_argument("--tuning", choices=["auto", *TUNINGS], default="auto")
+    audio.add_argument("--capo", type=int, default=0)
+    audio.add_argument("--stem", choices=["auto", "guitar", "other", "guitar+other"], default="auto")
+    audio.add_argument(
+        "--tab",
+        default="auto",
+        help="Guitar Pro tab whose notes to place on the recording: a file, 'auto' (one next to the song, named after it) or 'none'",
+    )
+    audio.add_argument("--track", type=int, help="track of the tab (default: the first guitar)")
+    audio.add_argument("--progress-json", action="store_true", help=machine)
+
+    retab = sub.add_parser("retab", help="place a Guitar Pro tab on a song already imported from audio")
+    retab.add_argument("file", type=Path, help="the .gp3/.gp4/.gp5 tab")
+    retab.add_argument("-o", "--out", type=Path, required=True, help="the imported song's folder")
+    retab.add_argument("--track", type=int, help="track of the tab (default: the first guitar)")
+    retab.add_argument("--progress-json", action="store_true", help=machine)
+
+    gp = sub.add_parser("guitarpro", help="Guitar Pro .gp3/.gp4/.gp5/.gp → chart")
+    gp.add_argument("file", type=Path)
+    gp.add_argument("-o", "--out", type=Path)
+    gp.add_argument("--track", type=int, help="track index (default: first guitar track)")
+    gp.add_argument("--progress-json", action="store_true", help=machine)
+
+    again = sub.add_parser("rechart", help="rebuild imported songs' charts from their stems (current charting rules)")
+    again.add_argument("folders", type=Path, nargs="+")
+    again.add_argument("--no-consensus", action="store_true", help="keep each repeat of a phrase as transcribed")
+    again.add_argument("--retune", action="store_true", help="detect the tuning again instead of keeping it")
+
+    tab = sub.add_parser("tab", help="print a chart as tablature")
+    tab.add_argument("chart", type=Path)
+    tab.add_argument("--level", type=int)
+    tab.add_argument("--from", dest="start", type=float, default=0.0)
+    tab.add_argument("--to", dest="end", type=float)
+
+    sub.add_parser("bench-guitarset", help="fingering agreement with GuitarSet guitarists")
+
+    demo = sub.add_parser("demo", help="the generated demo song shipped with the app (backing track + chart)")
+    demo.add_argument("-o", "--out", type=Path, required=True)
+
+    sub.add_parser("formats", help="the file extensions installed plugins import, as JSON {extension: command}")
+    formats: dict[str, str] = {}
+    for entry in entry_points(group=PLUGINS):
+        try:
+            register = entry.load()
+            run = register(sub, machine)
+        except Exception as e:  # a broken plugin leaves the other commands working
+            print(f"opensmith-ingest: plugin {entry.name} not loaded: {e}", file=sys.stderr)
+            continue
+        sub.choices[entry.name].set_defaults(plugin=run)
+        formats.update({ext.lower().lstrip("."): entry.name for ext in getattr(register, "formats", ())})
+    parser.set_defaults(formats=formats)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = _parser().parse_args(argv)
+    emit = JsonLines() if getattr(args, "progress_json", False) else None
+    try:
+        _run(args, emit)
+    except Exception as e:
+        if emit is None:
+            raise
+        emit(error=str(e) or type(e).__name__)
+        sys.exit(1)
+    sys.stdout.flush()
+
+
+def imported(emit: Emit | None, chart, path: Path, **extra) -> None:
+    """Reports an imported chart (plugins report theirs with it too)."""
+    if emit:
+        emit(done=True, chart=str(path), title=chart.title, artist=chart.artist, notes=len(chart.notes), chords=len(chart.chords), **extra)
+    else:
+        print(f"{chart.title}: {len(chart.notes)} notes, {len(chart.chords)} chords → {path}")
+
+
+def _run(args: argparse.Namespace, emit: Emit | None) -> None:
+    if getattr(args, "plugin", None):
+        args.plugin(args, emit)
+    elif args.cmd == "formats":
+        print(json.dumps(args.formats))
+    elif args.cmd == "audio":
+        from . import audio_io
+        from .naming import guess_title_artist
+        from .pipeline import ingest_audio
+
+        tags = audio_io.tags(args.song)
+        # Tags first, cleaned like file names: videos often tag "Artist - Title (Official Video)".
+        title, title_artist = guess_title_artist(tags.get("title") or args.song.stem, tags.get("artist"))
+        title = args.title or title
+        artist = args.artist or title_artist or tags.get("artist") or "Unknown"
+        out = args.out or Path("out") / args.song.stem
+        sink = (lambda stage, f: emit(stage=stage, fraction=round(f, 4))) if emit else None
+        from .align import find_tab
+
+        tab = None if args.tab == "none" else find_tab(args.song) if args.tab == "auto" else Path(args.tab)
+        report = ingest_audio(
+            args.song,
+            out,
+            title=title,
+            artist=artist,
+            tuning=_tuning(args),
+            device=args.device,
+            stem=args.stem,
+            progress=sink,
+            tab=tab,
+            track=args.track,
+        )
+        if emit:
+            c = report.chart
+            extra = {"tab": tab.name, "confirmed": round(report.confirmed or 0.0, 3)} if tab is not None else {}
+            imported(emit, c, report.chart_path, tuning=c.tuning.name, bpm=round(report.bpm, 1), seconds=round(report.total_seconds, 1), **extra)
+            return
+        print(report.summary())
+        if report.tuning_choice is not None:
+            c = report.tuning_choice
+            from .harmony import NOTE_NAMES
+
+            low = f"{NOTE_NAMES[c.lowest_played % 12]}{c.lowest_played // 12 - 1}" if c.lowest_played is not None else "-"
+            print(f"tuning: {c.tuning.name} (lowest note played {low}; {c.below_standard} notes below E standard) — override with --tuning")
+        print(f"→ {report.chart_path}")
+    elif args.cmd == "guitarpro":
+        if emit:
+            emit(stage="chart", fraction=0.1)
+        from .importers.guitarpro import load_guitarpro
+
+        chart = load_guitarpro(args.file, track=args.track)
+        out = args.out or Path("out") / args.file.stem
+        out.mkdir(parents=True, exist_ok=True)
+        chart.save(out / "song_chart.json")
+        imported(emit, chart, out / "song_chart.json")
+    elif args.cmd == "retab":
+        from .pipeline import retab
+
+        if emit:
+            emit(stage="chart", fraction=0.1)
+        report = retab(args.out, args.file, track=args.track)
+        if emit:
+            imported(emit, report.chart, report.chart_path, tab=args.file.name, confirmed=round(report.confirmed or 0.0, 3))
+            return
+        print(report.summary())
+        print(f"→ {report.chart_path}")
+    elif args.cmd == "rechart":
+        from .pipeline import rechart
+
+        for folder in args.folders:
+            report: dict = {}
+            chart = rechart(folder, consensus=not args.no_consensus, report=report, retune=args.retune)
+            details = ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in report.items())
+            print(f"{chart.artist} — {chart.title}: {len(chart.notes)} notes, {len(chart.chords)} chords, {len(chart.anchors)} hand positions ({details})")
+    elif args.cmd == "tab":
+        from .chart import Chart
+        from .preview import render
+
+        chart = Chart.load(args.chart)
+        level = chart.max_difficulty if args.level is None else args.level
+        print(f"{chart.artist} — {chart.title} [{chart.arrangement_name}, level {level}/{chart.max_difficulty}, {chart.bpm:.0f} BPM]")
+        print(render(chart, level, start=args.start, end=args.end))
+    elif args.cmd == "demo":
+        from .demo import make_demo
+
+        chart = make_demo(args.out)
+        print(f"{chart.artist} — {chart.title}: {len(chart.notes)} notes, {len(chart.chords)} chords → {args.out}")
+    elif args.cmd == "bench-guitarset":
+        from .benchmark import evaluate, fetch_annotations
+
+        score = evaluate(sorted(fetch_annotations().glob("*.jams")))
+        print(f"{score.notes} notes: {100 * score.accuracy:.1f}% on the guitarist's string (lowest-fret baseline {100 * score.baseline:.1f}%)")
+        for style, (n, hits) in score.by_style.items():
+            print(f"  {style}: {100 * hits / n:.1f}% of {n}")
+
+
+if __name__ == "__main__":
+    main()

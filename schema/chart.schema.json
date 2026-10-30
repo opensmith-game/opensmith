@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmith.local/schema/chart.schema.json",
+  "title": "OpenSmith chart",
+  "description": "One playable arrangement of a song: what the Note Highway shows and what the game judges. Times are seconds from the start of the audio. Dynamic difficulty: every note and chord carries the inclusive range of difficulty levels at which it is shown; the game keeps one level per phrase and adapts it to the player.",
+  "type": "object",
+  "required": ["format", "version", "meta", "audio", "arrangement", "tempo", "beats", "sections", "phrases", "chordTemplates", "notes", "chords", "anchors", "handShapes"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "const": "opensmith-chart" },
+    "version": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "required": ["title", "artist", "duration", "source", "generator"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "album": { "type": ["string", "null"] },
+        "year": { "type": ["integer", "null"] },
+        "duration": { "type": "number", "minimum": 0 },
+        "source": {
+          "type": "object",
+          "required": ["kind", "file"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "audio (transcribed), guitarpro, synth (generated); plugins name their own" },
+            "file": { "type": "string" }
+          }
+        },
+        "generator": { "type": "string" }
+      }
+    },
+    "audio": {
+      "description": "Files relative to the chart. `backing` is what plays during the game (the song without the guitar part).",
+      "type": "object",
+      "required": ["backing", "guitar", "mix", "offset"],
+      "additionalProperties": false,
+      "properties": {
+        "backing": { "type": ["string", "null"] },
+        "guitar": { "type": ["string", "null"] },
+        "mix": { "type": ["string", "null"] },
+        "offset": { "type": "number", "description": "Seconds to add to chart times to align them with the audio files." }
+      }
+    },
+    "arrangement": {
+      "type": "object",
+      "required": ["name", "type", "tuning", "capo", "maxDifficulty"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "enum": ["lead", "rhythm", "bass"] },
+        "tuning": {
+          "type": "object",
+          "required": ["name", "strings"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "strings": { "type": "array", "items": { "type": "integer" }, "minItems": 4, "maxItems": 8, "description": "Open-string MIDI pitches, string 0 (lowest) first." },
+            "cents": { "type": "number", "description": "The recording's pitch against A440, in cents: the guitar is tuned this much up to play along. Absent: 0." }
+          }
+        },
+        "capo": { "type": "integer", "minimum": 0 },
+        "maxDifficulty": { "type": "integer", "minimum": 0, "description": "Highest difficulty level; levels go from 0 (easiest) to this value (everything)." }
+      }
+    },
+    "tempo": {
+      "type": "object",
+      "required": ["bpm", "timeSignature"],
+      "additionalProperties": false,
+      "properties": {
+        "bpm": { "type": "number", "exclusiveMinimum": 0 },
+        "timeSignature": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 2 }
+      }
+    },
+    "beats": {
+      "description": "Beat grid for the highway lines. `bar` (1-based) marks the first beat of a bar.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time"],
+        "additionalProperties": false,
+        "properties": { "time": { "type": "number" }, "bar": { "type": "integer", "minimum": 1 } }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "phrases": {
+      "description": "Phrase iterations in time order. Iterations sharing a name are the same musical phrase (Loop Trainer, dynamic difficulty).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "start", "end", "maxDifficulty"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "start": { "type": "number" },
+          "end": { "type": "number" },
+          "maxDifficulty": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "chordTemplates": {
+      "description": "Chord shapes referenced by index. -1 = string not played; fingers 1-4 (index..pinky), 0 = open string.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "frets", "fingers"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "frets": { "type": "array", "items": { "type": "integer", "minimum": -1 } },
+          "fingers": { "type": "array", "items": { "type": "integer", "minimum": -1, "maximum": 4 } }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time", "string", "fret", "sustain", "levels"],
+        "additionalProperties": false,
+        "properties": {
+          "time": { "type": "number" },
+          "string": { "type": "integer", "minimum": 0 },
+          "fret": { "type": "integer", "minimum": 0 },
+          "sustain": { "type": "number", "minimum": 0 },
+          "levels": { "$ref": "#/$defs/levels" },
+          "techniques": { "$ref": "#/$defs/techniques" }
+        }
+      }
+    },
+    "chords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time", "template", "sustain", "levels"],
+        "additionalProperties": false,
+        "properties": {
+          "time": { "type": "number" },
+          "template": { "type": "integer", "minimum": 0 },
+          "sustain": { "type": "number", "minimum": 0 },
+          "levels": { "$ref": "#/$defs/levels" },
+          "strum": { "enum": ["down", "up"] },
+          "techniques": { "$ref": "#/$defs/techniques" }
+        }
+      }
+    },
+    "anchors": {
+      "description": "Fretting-hand position: the camera frames and the highway highlights frets fret..fret+width-1.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["time", "fret", "width"],
+        "additionalProperties": false,
+        "properties": {
+          "time": { "type": "number" },
+          "fret": { "type": "integer", "minimum": 0 },
+          "width": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "handShapes": {
+      "description": "Time a chord shape is held (also over arpeggiated notes).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["template", "start", "end"],
+        "additionalProperties": false,
+        "properties": {
+          "template": { "type": "integer", "minimum": 0 },
+          "start": { "type": "number" },
+          "end": { "type": "number" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["name", "start", "end"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "start": { "type": "number" }, "end": { "type": "number" } }
+    },
+    "levels": {
+      "description": "Inclusive [min, max] difficulty levels at which the event is shown.",
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "techniques": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hammerOn": { "const": true },
+        "pullOff": { "const": true },
+        "slideTo": { "type": "integer", "minimum": 0 },
+        "bend": { "type": "number", "description": "Bend amount in semitones (1 = half step, 2 = whole step)." },
+        "vibrato": { "const": true },
+        "palmMute": { "const": true },
+        "mute": { "const": true },
+        "harmonic": { "const": true },
+        "pinchHarmonic": { "const": true },
+        "tremolo": { "const": true },
+        "accent": { "const": true },
+        "tap": { "const": true },
+        "linkNext": { "const": true }
+      }
+    }
+  }
+}

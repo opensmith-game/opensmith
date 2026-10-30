@@ -1,0 +1,1382 @@
+{
+ "format": "opensmith-chart",
+ "version": 1,
+ "meta": {
+  "title": "First Riff",
+  "artist": "OpenSmith",
+  "album": "Demo",
+  "year": null,
+  "duration": 41.4,
+  "source": {
+   "kind": "synth",
+   "file": "opensmith-ingest demo"
+  },
+  "generator": "opensmith-ingest 0.1.0"
+ },
+ "audio": {
+  "backing": "backing.wav",
+  "guitar": null,
+  "mix": null,
+  "offset": 0.0
+ },
+ "arrangement": {
+  "name": "Lead",
+  "type": "lead",
+  "tuning": {
+   "name": "E Standard",
+   "strings": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64
+   ]
+  },
+  "capo": 0,
+  "maxDifficulty": 4
+ },
+ "tempo": {
+  "bpm": 100.0,
+  "timeSignature": [
+   4,
+   4
+  ]
+ },
+ "beats": [
+  {
+   "time": 1.0,
+   "bar": 1
+  },
+  {
+   "time": 1.6
+  },
+  {
+   "time": 2.2
+  },
+  {
+   "time": 2.8
+  },
+  {
+   "time": 3.4,
+   "bar": 2
+  },
+  {
+   "time": 4.0
+  },
+  {
+   "time": 4.6
+  },
+  {
+   "time": 5.2
+  },
+  {
+   "time": 5.8,
+   "bar": 3
+  },
+  {
+   "time": 6.4
+  },
+  {
+   "time": 7.0
+  },
+  {
+   "time": 7.6
+  },
+  {
+   "time": 8.2,
+   "bar": 4
+  },
+  {
+   "time": 8.8
+  },
+  {
+   "time": 9.4
+  },
+  {
+   "time": 10.0
+  },
+  {
+   "time": 10.6,
+   "bar": 5
+  },
+  {
+   "time": 11.2
+  },
+  {
+   "time": 11.8
+  },
+  {
+   "time": 12.4
+  },
+  {
+   "time": 13.0,
+   "bar": 6
+  },
+  {
+   "time": 13.6
+  },
+  {
+   "time": 14.2
+  },
+  {
+   "time": 14.8
+  },
+  {
+   "time": 15.4,
+   "bar": 7
+  },
+  {
+   "time": 16.0
+  },
+  {
+   "time": 16.6
+  },
+  {
+   "time": 17.2
+  },
+  {
+   "time": 17.8,
+   "bar": 8
+  },
+  {
+   "time": 18.4
+  },
+  {
+   "time": 19.0
+  },
+  {
+   "time": 19.6
+  },
+  {
+   "time": 20.2,
+   "bar": 9
+  },
+  {
+   "time": 20.8
+  },
+  {
+   "time": 21.4
+  },
+  {
+   "time": 22.0
+  },
+  {
+   "time": 22.6,
+   "bar": 10
+  },
+  {
+   "time": 23.2
+  },
+  {
+   "time": 23.8
+  },
+  {
+   "time": 24.4
+  },
+  {
+   "time": 25.0,
+   "bar": 11
+  },
+  {
+   "time": 25.6
+  },
+  {
+   "time": 26.2
+  },
+  {
+   "time": 26.8
+  },
+  {
+   "time": 27.4,
+   "bar": 12
+  },
+  {
+   "time": 28.0
+  },
+  {
+   "time": 28.6
+  },
+  {
+   "time": 29.2
+  },
+  {
+   "time": 29.8,
+   "bar": 13
+  },
+  {
+   "time": 30.4
+  },
+  {
+   "time": 31.0
+  },
+  {
+   "time": 31.6
+  },
+  {
+   "time": 32.2,
+   "bar": 14
+  },
+  {
+   "time": 32.8
+  },
+  {
+   "time": 33.4
+  },
+  {
+   "time": 34.0
+  },
+  {
+   "time": 34.6,
+   "bar": 15
+  },
+  {
+   "time": 35.2
+  },
+  {
+   "time": 35.8
+  },
+  {
+   "time": 36.4
+  },
+  {
+   "time": 37.0,
+   "bar": 16
+  },
+  {
+   "time": 37.6
+  },
+  {
+   "time": 38.2
+  },
+  {
+   "time": 38.8
+  },
+  {
+   "time": 39.4,
+   "bar": 17
+  },
+  {
+   "time": 40.0
+  },
+  {
+   "time": 40.6
+  },
+  {
+   "time": 41.2
+  }
+ ],
+ "sections": [
+  {
+   "name": "Section 1",
+   "start": 0.0,
+   "end": 1.0
+  },
+  {
+   "name": "Section 2",
+   "start": 1.0,
+   "end": 39.4
+  },
+  {
+   "name": "Section 3",
+   "start": 39.4,
+   "end": 41.4
+  }
+ ],
+ "phrases": [
+  {
+   "name": "rest",
+   "start": 0.0,
+   "end": 1.0,
+   "maxDifficulty": 0
+  },
+  {
+   "name": "A",
+   "start": 1.0,
+   "end": 10.6,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "B",
+   "start": 10.6,
+   "end": 20.2,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "A",
+   "start": 20.2,
+   "end": 29.8,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "B",
+   "start": 29.8,
+   "end": 39.4,
+   "maxDifficulty": 3
+  },
+  {
+   "name": "rest",
+   "start": 39.4,
+   "end": 41.4,
+   "maxDifficulty": 0
+  }
+ ],
+ "chordTemplates": [
+  {
+   "name": "E5",
+   "frets": [
+    0,
+    2,
+    2,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    0,
+    1,
+    1,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "G5",
+   "frets": [
+    3,
+    5,
+    5,
+    -1,
+    -1,
+    -1
+   ],
+   "fingers": [
+    2,
+    4,
+    4,
+    -1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "A5",
+   "frets": [
+    -1,
+    0,
+    2,
+    2,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    0,
+    1,
+    1,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "C5",
+   "frets": [
+    -1,
+    3,
+    5,
+    5,
+    -1,
+    -1
+   ],
+   "fingers": [
+    -1,
+    2,
+    4,
+    4,
+    -1,
+    -1
+   ]
+  },
+  {
+   "name": "D5",
+   "frets": [
+    -1,
+    -1,
+    0,
+    2,
+    3,
+    -1
+   ],
+   "fingers": [
+    -1,
+    -1,
+    0,
+    1,
+    2,
+    -1
+   ]
+  }
+ ],
+ "notes": [
+  {
+   "time": 1.0,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 2.2,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 3.4,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 3.7,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 4.0,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 4.3,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 4.6,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 5.2,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 5.8,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 7.0,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 8.2,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 8.5,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 8.8,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 9.1,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 9.4,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 10.0,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 10.6,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 11.8,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 13.0,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 13.3,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 13.6,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 13.9,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 14.2,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 14.8,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 15.4,
+   "string": 1,
+   "fret": 3,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 16.6,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 17.8,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 18.1,
+   "string": 3,
+   "fret": 4,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 18.4,
+   "string": 3,
+   "fret": 5,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 18.7,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 19.0,
+   "string": 5,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 19.6,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 20.2,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 21.4,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 22.6,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 22.9,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 23.2,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 23.5,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 23.8,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 24.4,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 25.0,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 26.2,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 27.4,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 27.7,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 28.0,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 28.3,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 28.6,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 29.2,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 29.8,
+   "string": 0,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 31.0,
+   "string": 1,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 32.2,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.3,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 32.5,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 32.8,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 33.1,
+   "string": 3,
+   "fret": 0,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 33.4,
+   "string": 2,
+   "fret": 2,
+   "sustain": 0.45,
+   "levels": [
+    1,
+    4
+   ]
+  },
+  {
+   "time": 34.0,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 34.6,
+   "string": 1,
+   "fret": 3,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 35.8,
+   "string": 2,
+   "fret": 0,
+   "sustain": 0.9,
+   "levels": [
+    0,
+    1
+   ]
+  },
+  {
+   "time": 37.0,
+   "string": 3,
+   "fret": 2,
+   "sustain": 0.0,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 37.3,
+   "string": 3,
+   "fret": 4,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 37.6,
+   "string": 3,
+   "fret": 5,
+   "sustain": 0.3,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 37.9,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 38.2,
+   "string": 5,
+   "fret": 0,
+   "sustain": 0.6,
+   "levels": [
+    0,
+    4
+   ]
+  },
+  {
+   "time": 38.8,
+   "string": 4,
+   "fret": 3,
+   "sustain": 0.0,
+   "levels": [
+    2,
+    4
+   ]
+  }
+ ],
+ "chords": [
+  {
+   "time": 1.0,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 1.9,
+   "template": 1,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 2.2,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 5.8,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 6.7,
+   "template": 1,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 7.0,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 10.6,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 11.5,
+   "template": 1,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 11.8,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 15.4,
+   "template": 3,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 16.6,
+   "template": 4,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 20.2,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 21.1,
+   "template": 1,
+   "sustain": 0.0,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 21.4,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 25.0,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 25.9,
+   "template": 1,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 26.2,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 29.8,
+   "template": 0,
+   "sustain": 0.6,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 30.7,
+   "template": 1,
+   "sustain": 0.3,
+   "levels": [
+    3,
+    4
+   ]
+  },
+  {
+   "time": 31.0,
+   "template": 2,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 34.6,
+   "template": 3,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  },
+  {
+   "time": 35.8,
+   "template": 4,
+   "sustain": 0.9,
+   "levels": [
+    2,
+    4
+   ]
+  }
+ ],
+ "anchors": [
+  {
+   "time": 1.0,
+   "fret": 2,
+   "width": 4
+  }
+ ],
+ "handShapes": [
+  {
+   "template": 0,
+   "start": 1.0,
+   "end": 1.9
+  },
+  {
+   "template": 1,
+   "start": 1.9,
+   "end": 2.2
+  },
+  {
+   "template": 2,
+   "start": 2.2,
+   "end": 3.4
+  },
+  {
+   "template": 0,
+   "start": 5.8,
+   "end": 6.7
+  },
+  {
+   "template": 1,
+   "start": 6.7,
+   "end": 7.0
+  },
+  {
+   "template": 2,
+   "start": 7.0,
+   "end": 8.2
+  },
+  {
+   "template": 0,
+   "start": 10.6,
+   "end": 11.5
+  },
+  {
+   "template": 1,
+   "start": 11.5,
+   "end": 11.8
+  },
+  {
+   "template": 2,
+   "start": 11.8,
+   "end": 13.0
+  },
+  {
+   "template": 3,
+   "start": 15.4,
+   "end": 16.6
+  },
+  {
+   "template": 4,
+   "start": 16.6,
+   "end": 17.8
+  },
+  {
+   "template": 0,
+   "start": 20.2,
+   "end": 21.1
+  },
+  {
+   "template": 1,
+   "start": 21.1,
+   "end": 21.4
+  },
+  {
+   "template": 2,
+   "start": 21.4,
+   "end": 22.6
+  },
+  {
+   "template": 0,
+   "start": 25.0,
+   "end": 25.9
+  },
+  {
+   "template": 1,
+   "start": 25.9,
+   "end": 26.2
+  },
+  {
+   "template": 2,
+   "start": 26.2,
+   "end": 27.4
+  },
+  {
+   "template": 0,
+   "start": 29.8,
+   "end": 30.7
+  },
+  {
+   "template": 1,
+   "start": 30.7,
+   "end": 31.0
+  },
+  {
+   "template": 2,
+   "start": 31.0,
+   "end": 32.2
+  },
+  {
+   "template": 3,
+   "start": 34.6,
+   "end": 35.8
+  },
+  {
+   "template": 4,
+   "start": 35.8,
+   "end": 37.0
+  }
+ ]
+}

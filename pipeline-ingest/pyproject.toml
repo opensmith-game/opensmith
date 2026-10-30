@@ -1,0 +1,39 @@
+[project]
+name = "opensmith-ingest"
+version = "0.1.0"
+description = "OpenSmith Pipeline-Ingest: MP3 → stems → transcription → playable game chart"
+authors = [
+    { name = "Julien Deudon" }
+]
+requires-python = ">=3.11,<3.12"
+license = "GPL-3.0-or-later"
+dependencies = [
+    "basic-pitch>=0.4.0",
+    "demucs>=4.0.1",
+    "jsonschema>=4.26.0",
+    "librosa>=0.10",
+    "numpy>=2.4.6",
+    "pyguitarpro>=0.11",
+    "scipy>=1.17.1",
+    "setuptools>=77,<80",
+    "soundfile>=0.14.0",
+    "soxr>=1.1.0",
+    "torch>=2.14.1",
+]
+
+[project.scripts]
+opensmith-ingest = "opensmith_ingest:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+markers = ["slow: end-to-end runs with stem separation and transcription (~1 min)"]
+addopts = "-m 'not slow'"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning", "ignore::FutureWarning"]
