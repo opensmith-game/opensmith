@@ -78,6 +78,8 @@ export interface Engine {
   library(): Promise<SongEntry[]>;
   /** `levels`: the level each phrase (by name) starts at, from earlier sessions. */
   load(id: string, levels?: Record<string, number>): Promise<Chart>;
+  /** A chart made in the app (a lesson), all its notes at once, over a metronome on its beats. */
+  loadLesson(chart: Chart): Promise<Chart>;
   play(): void;
   pause(): void;
   /** Moves to `time` and starts judging from there. */

@@ -123,6 +123,15 @@ export class TauriEngine implements Engine {
     return chart;
   }
 
+  async loadLesson(lesson: Chart): Promise<Chart> {
+    const raw = await invoke<unknown>('load_lesson', { json: JSON.stringify(lesson) });
+    this.transposed = 0;
+    const chart = parseChart(raw);
+    this.clock = new ClockSync();
+    this.running = false;
+    return chart;
+  }
+
   play(): void {
     this.running = true;
     void invoke('play');

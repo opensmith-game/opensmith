@@ -1,0 +1,105 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pitch } from '../src/chart';
+import { CHORDS, lessonChart, lessons, loadLessons, nextLesson, passed, recordLesson, STANDARD } from '../src/lessons';
+
+/** A localStorage for the node test environment. */
+function storage(initial: Record<string, string> = {}) {
+  const data = new Map(Object.entries(initial));
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+  });
+  return data;
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('lessons', () => {
+  it('make charts the engine plays: a bar of clicks, then the notes, in order, inside the song', () => {
+    const all = lessons();
+    expect(all.length).toBe(10);
+    expect(new Set(all.map((l) => l.id)).size).toBe(all.length);
+    all.forEach((lesson, i) => {
+      const c = lessonChart(lesson, i);
+      expect(c.format).toBe('opensmith-chart');
+      expect(c.meta.title).toBe(`Leçon ${i + 1} · ${lesson.title}`);
+      expect(c.arrangement.tuning.strings).toEqual(STANDARD);
+      const spb = 60 / lesson.bpm;
+      const times = [...c.notes.map((n) => n.time), ...c.chords.map((ch) => ch.time)].sort((a, b) => a - b);
+      expect(times.length).toBe(lesson.steps.length);
+      // The metronome counts one bar in before the first note.
+      expect(times[0]).toBeCloseTo(4 * spb);
+      expect(c.notes.map((n) => n.time)).toEqual([...c.notes.map((n) => n.time)].sort((a, b) => a - b));
+      expect(times[times.length - 1]).toBeLessThan(c.meta.duration);
+      // Under a minute and a half each, a few seconds of clicks after the last note.
+      expect(c.meta.duration).toBeLessThan(90);
+      expect(c.beats[0]).toEqual({ time: 0, bar: 1 });
+      expect(c.beats.filter((b) => b.bar).length).toBe(Math.ceil(c.beats.length / 4));
+      expect(c.beats[c.beats.length - 1].time).toBeGreaterThanOrEqual(c.meta.duration - 1e-9);
+      // Every note in the first five frets of a standard guitar, every chord a known shape.
+      for (const n of c.notes) {
+        expect(n.fret).toBeGreaterThanOrEqual(0);
+        expect(n.fret).toBeLessThanOrEqual(5);
+        expect(pitch(c, n.string, n.fret)).toBeGreaterThanOrEqual(40);
+      }
+      for (const ch of c.chords) expect(CHORDS[c.chordTemplates[ch.template].name].frets).toEqual(c.chordTemplates[ch.template].frets);
+      expect(c.handShapes.length).toBe(c.chords.length);
+      expect(c.phrases).toHaveLength(1);
+      expect(c.arrangement.maxDifficulty).toBe(0);
+    });
+  });
+
+  it('keep the hand where the next fretted notes are', () => {
+    lessons().forEach((lesson, i) => {
+      const c = lessonChart(lesson, i);
+      const pressed = [
+        ...c.notes.filter((n) => n.fret > 0).map((n) => ({ time: n.time, frets: [n.fret] })),
+        ...c.chords.map((ch) => ({ time: ch.time, frets: c.chordTemplates[ch.template].frets.filter((f) => f > 0) })),
+      ];
+      for (const p of pressed) {
+        const anchor = [...c.anchors].reverse().find((a) => a.time <= p.time)!;
+        for (const f of p.frets) {
+          expect(f).toBeGreaterThanOrEqual(anchor.fret);
+          expect(f).toBeLessThan(anchor.fret + anchor.width);
+        }
+      }
+    });
+  });
+
+  it('play the melody as written: Au clair de la lune on the G and B strings', () => {
+    const all = lessons();
+    const i = all.findIndex((l) => l.id === 'melody');
+    const c = lessonChart(all[i], i);
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    expect(c.notes.slice(0, 11).map((n) => names[pitch(c, n.string, n.fret) % 12]).join(' ')).toBe('G G G A B A G B A A G');
+    // Long notes show their trail.
+    expect(c.notes[4].sustain).toBeGreaterThan(0);
+    expect(c.notes[0].sustain).toBe(0);
+  });
+
+  it('keep each lesson’s best and lead to the first one not passed', () => {
+    const data = storage();
+    const all = lessons();
+    expect(nextLesson(all, {})).toBe(0);
+    let records = recordLesson({}, all[0].id, 0.5);
+    expect(passed(all[0], records)).toBe(false);
+    expect(nextLesson(all, records)).toBe(0);
+    records = recordLesson(records, all[0].id, 0.9);
+    records = recordLesson(records, all[0].id, 0.6);
+    expect(records[all[0].id]).toBe(0.9);
+    expect(nextLesson(all, records)).toBe(1);
+    expect(JSON.parse(data.get('opensmith.lessons')!)).toEqual({ [all[0].id]: 0.9 });
+    expect(loadLessons()).toEqual(records);
+    const everything = Object.fromEntries(all.map((l) => [l.id, 1]));
+    expect(nextLesson(all, everything)).toBe(all.length - 1);
+  });
+
+  it('ignore a damaged record, and work without storage', () => {
+    storage({ 'opensmith.lessons': JSON.stringify({ 'open-strings': 0.8, 'in-time': 'oui', spider: 7 }) });
+    expect(loadLessons()).toEqual({ 'open-strings': 0.8 });
+    storage({ 'opensmith.lessons': '{nope' });
+    expect(loadLessons()).toEqual({});
+    vi.unstubAllGlobals();
+    expect(recordLesson({}, 'open-strings', 0.7)).toEqual({ 'open-strings': 0.7 });
+  });
+});

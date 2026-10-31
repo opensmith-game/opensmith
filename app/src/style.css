@@ -1738,6 +1738,11 @@ body.live .live-tools {
   font-weight: 700;
 }
 
+/* After a line on the timing, the records keep their own space. */
+.challenge-result + .records {
+  margin-top: 6px;
+}
+
 /* Loop Trainer */
 
 .riff-panel {
@@ -3088,6 +3093,131 @@ body:not(.live) .live-only {
 .encore-song span {
   color: var(--muted);
   font-size: 12.5px;
+}
+
+/* Lessons */
+
+.lessons-panel {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.lessons-count {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.lesson-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.lesson.passed {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.lesson.next {
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.lesson.open {
+  background: rgba(140, 165, 255, 0.06);
+}
+
+.lesson-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lesson-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(140, 165, 255, 0.1);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.lesson.passed .lesson-number {
+  background: var(--good);
+  color: #05200f;
+}
+
+.lesson.next .lesson-number {
+  background: var(--gold);
+  color: #2a1a00;
+  box-shadow: 0 0 16px rgba(255, 209, 102, 0.45);
+}
+
+.lesson-text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.lesson-text b {
+  font-size: 15px;
+}
+
+.lesson-text span,
+.lesson-text small {
+  color: var(--muted);
+}
+
+.lesson-text small {
+  font-size: 11.5px;
+}
+
+.lesson.passed .lesson-text small {
+  color: var(--good);
+}
+
+.lesson-how {
+  padding: 0 14px 14px 60px;
+}
+
+.lesson-how h3 {
+  margin: 4px 0 6px;
+  font-size: 13px;
+}
+
+.lesson-how ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.lesson-how li + li {
+  margin-top: 4px;
+}
+
+.lesson-tempo {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* Trophies */

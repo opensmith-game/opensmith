@@ -16,7 +16,7 @@ use import::{Importer, Job, JobState, Origin, Pipeline, Queue, ORIGIN};
 use opensmith_audio::{list_devices, Engine, EngineConfig, InputKind};
 use opensmith_dsp::{AmpKnobs, AmpModel, ChainParams};
 use opensmith_game::Chart;
-use opensmith_session::{load_track, load_track_with_stem, Command, Devices, EngineBackend, RiffLoop, SessionConfig, SessionHandle, UiEvent};
+use opensmith_session::{load_track, load_track_with_stem, metronome, Command, Devices, EngineBackend, RiffLoop, SessionConfig, SessionHandle, UiEvent};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 
@@ -283,8 +283,8 @@ fn level_notes(chart: &Chart) -> Vec<usize> {
     let mut out = vec![0; top + 1];
     let ranges = chart.notes.iter().map(|n| n.levels).chain(chart.chords.iter().map(|c| c.levels));
     for [lo, hi] in ranges {
-        for d in lo as usize..=(hi as usize).min(top) {
-            out[d] += 1;
+        for count in out.iter_mut().take((hi as usize).min(top) + 1).skip(lo as usize) {
+            *count += 1;
         }
     }
     out
@@ -523,6 +523,20 @@ async fn load_song(
     );
     app.session.send(Command::Load { chart: Box::new(chart), track, start: -COUNT_IN, levels });
     Ok(json)
+}
+
+/// A lesson (a chart the app makes): every note from the start, over a metronome on its beats.
+#[tauri::command]
+fn load_lesson(app: State<'_, App>, json: String) -> Result<serde_json::Value, String> {
+    let chart = Chart::from_json(&json).map_err(|e| e.to_string())?;
+    let value: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+    let beats: Vec<(f64, bool)> = chart.beats.iter().map(|b| (b.time, b.bar.is_some())).collect();
+    let track = metronome(&beats, chart.meta.duration + 0.5, app.sample_rate);
+    app.session.send(Command::StartLevel(chart.arrangement.max_difficulty));
+    app.session.send(Command::Dynamic(false));
+    eprintln!("leçon chargée : {} ({} notes, {} accords)", chart.meta.title, chart.notes.len(), chart.chords.len());
+    app.session.send(Command::Load { chart: Box::new(chart), track: Some(track), start: -COUNT_IN, levels: HashMap::new() });
+    Ok(value)
 }
 
 /// The player's progress (scores, phrase levels, mastery), kept in the library folder.
@@ -859,6 +873,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             library,
             load_song,
+            load_lesson,
             play,
             pause,
             seek,

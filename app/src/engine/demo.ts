@@ -11,6 +11,22 @@ import type { Engine, Frame, RiffLoop, SongEntry } from './types';
  * without a backing track) it follows performance.now(). Slowed down, the music also drops in
  * pitch here (the native engine keeps it); the Loop Trainer loop jumps back from the clock.
  */
+/** Clicks on the chart's beats, higher on the first of each bar. */
+export function metronome(ctx: BaseAudioContext, chart: Chart): AudioBuffer {
+  const sr = ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, Math.ceil((chart.meta.duration + 0.5) * sr), sr);
+  const data = buffer.getChannelData(0);
+  for (const beat of chart.beats) {
+    const freq = beat.bar ? 1320 : 880;
+    const start = Math.round(beat.time * sr);
+    for (let i = 0; i < 0.05 * sr && start + i < data.length; i++) {
+      const t = i / sr;
+      data[start + i] = 0.6 * Math.exp(-t / 0.012) * Math.sin(2 * Math.PI * freq * t);
+    }
+  }
+  return buffer;
+}
+
 export class DemoEngine implements Engine {
   readonly kind = 'demo' as const;
   readonly progress = localProgress;
@@ -80,6 +96,19 @@ export class DemoEngine implements Engine {
         console.warn('piste d’accompagnement indisponible, lecture muette', e);
       }
     }
+    return this.begin(chart);
+  }
+
+  async loadLesson(chart: Chart): Promise<Chart> {
+    this.levels = {};
+    this.pause();
+    this.ctx ??= new AudioContext({ latencyHint: 'interactive' });
+    this.buffer = metronome(this.ctx, chart);
+    return this.begin(chart);
+  }
+
+  /** `chart` loaded, its backing track ready: the game starts over at its beginning. */
+  private begin(chart: Chart): Chart {
     this.chart = chart;
     this.held = 0;
     this.ended = false;

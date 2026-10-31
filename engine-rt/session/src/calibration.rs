@@ -39,28 +39,45 @@ impl CalibrationPlan {
 
     /// The click track, stereo at `sample_rate`: high clicks count in, accents mark each bar.
     pub fn track(&self, sample_rate: u32) -> Track {
-        let sr = sample_rate as f64;
-        let frames = ((self.end() + 0.5) * sr) as usize;
-        let mut data = vec![0f32; frames * 2];
-        for k in 0..self.count_in + self.clicks {
-            let freq = if k < self.count_in {
-                1760.0
-            } else if (k - self.count_in) % 4 == 0 {
-                1320.0
-            } else {
-                880.0
-            };
-            let start = (self.click(k) * sr) as usize;
-            for i in 0..(0.05 * sr) as usize {
-                let t = i as f64 / sr;
-                let v = (0.6 * (-t / 0.012).exp() * (std::f64::consts::TAU * freq * t).sin()) as f32;
-                if let Some(frame) = data.get_mut(2 * (start + i)..2 * (start + i) + 2) {
-                    frame.fill(v);
-                }
+        let clicks: Vec<(f64, f64)> = (0..self.count_in + self.clicks)
+            .map(|k| {
+                let freq = if k < self.count_in {
+                    1760.0
+                } else if (k - self.count_in) % 4 == 0 {
+                    1320.0
+                } else {
+                    880.0
+                };
+                (self.click(k), freq)
+            })
+            .collect();
+        click_track(&clicks, self.end() + 0.5, sample_rate)
+    }
+}
+
+/// A metronome on `beats` (song time, whether it starts a bar: a higher click), `seconds` long,
+/// stereo at `sample_rate`: the lessons' accompaniment.
+pub fn metronome(beats: &[(f64, bool)], seconds: f64, sample_rate: u32) -> Track {
+    let clicks: Vec<(f64, f64)> = beats.iter().map(|&(time, bar)| (time, if bar { 1320.0 } else { 880.0 })).collect();
+    click_track(&clicks, seconds, sample_rate)
+}
+
+/// Clicks (song time, pitch in Hz) of 50 ms, stereo, `seconds` long.
+fn click_track(clicks: &[(f64, f64)], seconds: f64, sample_rate: u32) -> Track {
+    let sr = sample_rate as f64;
+    let frames = (seconds.max(0.0) * sr) as usize;
+    let mut data = vec![0f32; frames * 2];
+    for &(time, freq) in clicks {
+        let start = (time * sr) as usize;
+        for i in 0..(0.05 * sr) as usize {
+            let t = i as f64 / sr;
+            let v = (0.6 * (-t / 0.012).exp() * (std::f64::consts::TAU * freq * t).sin()) as f32;
+            if let Some(frame) = data.get_mut(2 * (start + i)..2 * (start + i) + 2) {
+                frame.fill(v);
             }
         }
-        Track::from_interleaved(&data, 2)
     }
+    Track::from_interleaved(&data, 2)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -161,5 +178,28 @@ mod tests {
         assert!(s[at(plan.click(5))..at(plan.click(5)) + 200].iter().any(|v| v.abs() > 0.3));
         assert!(s[at(plan.click(5)) - 2000..at(plan.click(5))].iter().all(|v| *v == 0.0));
         assert!(track.frames() as f64 / 48_000.0 > plan.end());
+    }
+
+    #[test]
+    fn the_metronome_clicks_on_each_beat_higher_on_the_bar() {
+        let sr = 48_000;
+        let track = metronome(&[(0.0, true), (0.5, false), (1.0, false)], 2.0, sr);
+        assert_eq!(track.frames(), 2 * sr as usize);
+        // Loud right after each beat, silent between them.
+        let level = |from: f64, to: f64| {
+            let (a, b) = ((from * sr as f64) as usize, (to * sr as f64) as usize);
+            (a..b).map(|i| track.samples()[2 * i].abs()).fold(0.0f32, f32::max)
+        };
+        for beat in [0.0, 0.5, 1.0] {
+            assert!(level(beat, beat + 0.01) > 0.3, "click at {beat}");
+            assert!(level(beat + 0.1, beat + 0.4) == 0.0, "silence after {beat}");
+        }
+        assert_eq!(level(1.1, 2.0), 0.0);
+        // The bar's click is higher: more zero crossings in its first 10 ms.
+        let crossings = |at: f64| {
+            let a = (at * sr as f64) as usize + 1;
+            (a..a + 480).filter(|&i| (track.samples()[2 * i] > 0.0) != (track.samples()[2 * i + 2] > 0.0)).count()
+        };
+        assert!(crossings(0.0) > crossings(0.5));
     }
 }

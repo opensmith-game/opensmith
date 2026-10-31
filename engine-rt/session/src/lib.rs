@@ -17,7 +17,7 @@ mod session;
 mod take;
 mod track;
 
-pub use calibration::{Calibration, CalibrationPlan, CalibrationResult, MIN_HITS};
+pub use calibration::{metronome, Calibration, CalibrationPlan, CalibrationResult, MIN_HITS};
 pub use events::{UiEvent, UiExpected, UiMissReason, UiScore, UiTarget};
 pub use history::TapHistory;
 pub use runner::{Command, Devices, EngineBackend, Poll, SessionHandle};

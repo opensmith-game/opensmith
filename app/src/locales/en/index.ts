@@ -4,7 +4,8 @@
  */
 import { CAREER } from './career';
 import { CAREER_SCREEN } from './career-screen';
+import { LESSONS } from './lessons';
 import { MAIN } from './main';
 import { SCREENS } from './screens';
 
-export const EN: Record<string, string> = { ...MAIN, ...SCREENS, ...CAREER, ...CAREER_SCREEN };
+export const EN: Record<string, string> = { ...MAIN, ...SCREENS, ...CAREER, ...CAREER_SCREEN, ...LESSONS };

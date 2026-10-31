@@ -65,6 +65,8 @@ import {
 import { guitarOf } from './guitars';
 import { award, careerTrophies, perfectSolo, songTrophies, TROPHIES, type GigFeat, type Trophy } from './trophies';
 import { announce, showTrophies } from './trophy-board';
+import { lessonChart, lessons, loadLessons, nextLesson, passed, recordLesson } from './lessons';
+import { LessonsScreen } from './lessons-screen';
 import { settleChallenge, TIERS, type Challenge } from './career/challenge';
 import { levelOf } from './career/difficulty';
 import { learn, rehearse, REHEARSAL, starter } from './career/repertoire';
@@ -162,6 +164,10 @@ let challengeRun: Challenge | null = null;
 let studioRun: string | null = null;
 /** Playback speed of the song (outside the Loop Trainer): slowed down, a play is practice. */
 let playSpeed = 1;
+/** The lesson being played (its index), null for a song. */
+let lessonRun: number | null = null;
+/** Each lesson's best, kept on this Mac. */
+let lessonRecords = loadLessons();
 const screens = {
   menu: $('menu'),
   library: $('library'),
@@ -173,6 +179,7 @@ const screens = {
   interlude: $('interlude'),
   encore: $('encore'),
   trophies: $('trophies'),
+  lessons: $('lessons'),
 };
 let imports: Imports | null = null;
 let audio: AudioStatus | null = null;
@@ -190,7 +197,7 @@ langSelect.replaceChildren(...LANGS.map((l) => new Option(l.label, l.id)));
 langSelect.value = lang();
 langSelect.addEventListener('change', () => setLang(langSelect.value as Lang));
 
-type Mode = 'menu' | 'library' | 'imports' | 'tuner' | 'settings' | 'amp' | 'riff' | 'play' | 'pause' | 'results' | 'career' | 'interlude' | 'encore' | 'trophies';
+type Mode = 'menu' | 'library' | 'imports' | 'tuner' | 'settings' | 'amp' | 'riff' | 'play' | 'pause' | 'results' | 'career' | 'interlude' | 'encore' | 'trophies' | 'lessons';
 let mode: Mode = 'menu';
 let songs: SongEntry[] = [];
 let current: SongEntry | null = null;
@@ -328,18 +335,18 @@ function wearGuitar(): void {
 function setMode(next: Mode): void {
   mode = next;
   // The hardware strip in the menus; the game's own HUD takes the top during a song.
-  hwHud.show(['menu', 'library', 'imports', 'settings', 'career', 'trophies', 'amp'].includes(next));
+  hwHud.show(['menu', 'library', 'imports', 'settings', 'career', 'trophies', 'amp', 'lessons'].includes(next));
   for (const [name, el] of Object.entries(screens)) el.hidden = name !== next;
   hud.show(next === 'play' || next === 'pause' || next === 'results');
-  if (next === 'results') screens.results.querySelector<HTMLElement>('[data-action="library"]')!.textContent = challengeRun || studioRun ? t('Carrière') : t('Morceaux');
+  if (next === 'results') screens.results.querySelector<HTMLElement>('[data-action="library"]')!.textContent = backLabel();
   if (next === 'pause') {
     const button = (action: string) => screens.pause.querySelector<HTMLElement>(`[data-action="${action}"]`)!;
     button('restart').textContent = riff ? t('Recommencer la passe') : t('Recommencer');
     button('riff').textContent = riff ? t('Modifier le riff') : t('Loop Trainer');
     // On stage, no starting over and no Loop Trainer: only going on, or leaving.
     button('restart').hidden = !!gig;
-    button('riff').hidden = !!gig;
-    button('library').textContent = gig ? t('Quitter le concert') : challengeRun || studioRun ? t('Carrière') : t('Morceaux');
+    button('riff').hidden = !!gig || lessonRun !== null;
+    button('library').textContent = gig ? t('Quitter le concert') : backLabel();
     $('pauseGig').hidden = !gig;
     const free = gig ? gig.pauses < stageRules().freePauses : false;
     $('pauseGig').textContent = gig
@@ -349,6 +356,11 @@ function setMode(next: Mode): void {
       : '';
     showPause();
   }
+}
+
+/** Where leaving a song goes back to. */
+function backLabel(): string {
+  return lessonRun !== null ? t('Leçons') : challengeRun || studioRun ? t('Carrière') : t('Morceaux');
 }
 
 const quick = $<HTMLFormElement>('quick');
@@ -938,6 +950,13 @@ function updateMenu(): void {
   $('menuTrophies').textContent = won
     ? t('{won} sur {total}', { won, total: TROPHIES.length })
     : t('{won} sur {total} : sur scène et sur les morceaux', { won, total: TROPHIES.length });
+  const all = lessons();
+  const done = all.filter((l) => passed(l, lessonRecords)).length;
+  $('menuLessons').textContent = done
+    ? done === all.length
+      ? t('Toutes réussies : place aux morceaux !')
+      : t('{done} sur {total} réussies · prochaine : {title}', { done, total: all.length, title: all[nextLesson(all, lessonRecords)].title })
+    : t('Pour apprendre à jouer, en partant de zéro');
   const n = songs.length;
   $('menuSongs').textContent = n ? tn(n, '{n} morceau dans la bibliothèque', '{n} morceaux dans la bibliothèque') : t('Aucun morceau pour l’instant');
   const last = lastPlayed();
@@ -956,6 +975,7 @@ function updateMenu(): void {
 /** Back to the main menu, from anywhere outside a song. */
 function showMenu(): void {
   if (gig) finishGig('abandoned');
+  lessonRun = null;
   challengeRun = null;
   studioRun = null;
   if ((tuner.visible || ampPanel.visible) && engine instanceof TauriEngine) engine.setTuner(false);
@@ -979,6 +999,7 @@ function openImports(): void {
 }
 
 async function start(id: string, riffOpening = false): Promise<void> {
+  lessonRun = null;
   current = findSong(songs, id) ?? null;
   riffFirst = riffOpening;
   currentId = id;
@@ -1136,6 +1157,73 @@ const careerScreen = new CareerScreen($('career'), {
   },
   back: () => showMenu(),
 });
+
+const lessonsScreen = new LessonsScreen($('lessons'), (index) => {
+  engine.unlock();
+  void startLesson(index);
+});
+
+/** The lessons, the one just played (or the next to pass) opened. */
+function openLessons(picked?: number): void {
+  lessonsScreen.show(lessons(), lessonRecords, picked);
+  setMode('lessons');
+}
+
+/** Lesson `index`, played over its metronome after the tuner. */
+async function startLesson(index: number): Promise<void> {
+  const lesson = lessons()[index];
+  if (!lesson) return;
+  lessonRun = index;
+  current = null;
+  currentId = null;
+  riffFirst = false;
+  riff = null;
+  playSpeed = 1;
+  showRiff();
+  attack = null;
+  attackNext = null;
+  forcedStep = null;
+  levelsForced = false;
+  challengeRun = null;
+  studioRun = null;
+  attackHud.show(null);
+  applyDemoSettings();
+  try {
+    chart = await engine.loadLesson(lessonChart(lesson, index));
+  } catch (e) {
+    notice(t('Impossible d’ouvrir la leçon : {error}', { error: (e as Error).message }));
+    return;
+  }
+  heldTuning = chart.arrangement.tuning.strings;
+  view = new GameView(chart);
+  highway.setChart(chart);
+  hud.toast({ kind: 'phrase', title: lesson.title, detail: lesson.how[0] });
+  if (engine instanceof TauriEngine) openTuner(chart);
+  else restart();
+}
+
+/** End of a lesson: passed or not, its best kept, and the way to the next one. */
+function lessonVerdict(acc: number, judged: boolean, practice: boolean): void {
+  const list = lessons();
+  const index = lessonRun!;
+  const lesson = list[index];
+  if (judged && !practice && !autopiloting()) lessonRecords = recordLesson(lessonRecords, lesson.id, acc);
+  const ok = judged && !practice && acc >= lesson.goal;
+  const pct = (x: number) => t('{n} %', { n: Math.round(x * 100) });
+  $('verdict').textContent = ok ? t('Leçon réussie !') : practice ? t('Entraînement au ralenti') : t('Encore un essai !');
+  const next = list[index + 1];
+  $('records').textContent = ok
+    ? next
+      ? t('Prochaine leçon : {title}', { title: next.title })
+      : t('Toutes les leçons sont réussies : place aux vrais morceaux !')
+    : practice
+      ? t('Reviens à 100 % de la vitesse pour réussir la leçon.')
+      : t('Tu as joué {acc} des notes, l’objectif est {goal}.', { acc: pct(judged ? acc : 0), goal: pct(lesson.goal) });
+  $('records').classList.toggle('new', ok);
+  const go = screens.results.querySelector<HTMLElement>('[data-action="next-lesson"]')!;
+  go.hidden = !ok || !next;
+  screens.results.querySelector<HTMLElement>('[data-action="restart"]')!.classList.toggle('primary', go.hidden);
+}
 
 async function openTrophies(): Promise<void> {
   await careerLoaded;
@@ -1395,7 +1483,11 @@ function toLibrary(): void {
   view = null;
   highway.setChart(null);
   // The weekly challenge goes back to the career it belongs to.
-  if (challengeRun || studioRun) {
+  if (lessonRun !== null) {
+    const index = lessonRun;
+    lessonRun = null;
+    openLessons(index);
+  } else if (challengeRun || studioRun) {
     challengeRun = null;
     studioRun = null;
     void openCareer();
@@ -1579,9 +1671,9 @@ function showResults(): void {
   let records = '';
   // Slowed down, a play is practice: no records, no rehearsal, no trophy.
   const practice = playSpeed < 1;
-  const outcome = attack || practice ? null : recordSong(grade);
+  const outcome = attack || practice || lessonRun !== null ? null : recordSong(grade);
   document.querySelector('#results .challenge-result.take')?.remove();
-  if (!practice) {
+  if (!practice && lessonRun === null) {
     // A song of the repertoire played through: a rehearsal; a studio take when recording.
     rehearseSong();
     if (studioRun && studioRun === currentId) settleTake(studioRun, accuracy(view.score));
@@ -1604,6 +1696,10 @@ function showResults(): void {
   }
   $('records').textContent = records;
   $('records').classList.toggle('new', records.includes('!'));
+  screens.results.querySelector<HTMLElement>('[data-action="riff-weakest"]')!.hidden = lessonRun !== null;
+  screens.results.querySelector<HTMLElement>('[data-action="next-lesson"]')!.hidden = true;
+  screens.results.querySelector<HTMLElement>('[data-action="restart"]')!.classList.add('primary');
+  if (lessonRun !== null) lessonVerdict(acc, judged, practice);
   showAttackResults(grade);
   showTiming(view);
   // One bar per phrase: height = level played, colour = how well.
@@ -1717,6 +1813,8 @@ document.addEventListener('click', (e) => {
   } else if (action === 'menu' || action === 'pause-menu') showMenu();
   else if (action === 'open-career') void openCareer();
   else if (action === 'open-trophies') void openTrophies();
+  else if (action === 'open-lessons') openLessons();
+  else if (action === 'next-lesson' && lessonRun !== null) void startLesson(lessonRun + 1);
   else if (action === 'encore-song') playEncore((e.target as HTMLElement).closest<HTMLElement>('[data-song]')?.dataset.song ?? '');
   else if (action === 'encore-skip') finishGig('played');
   else if (action === 'gig-next') nextGigSong();
@@ -1768,10 +1866,15 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
+  if (mode === 'lessons' && (e.key === 'Enter' || e.key === ' ') && !(e.target instanceof HTMLButtonElement)) {
+    e.preventDefault();
+    lessonsScreen.startPicked();
+    return;
+  }
   switch (e.key) {
     case 'l':
     case 'L':
-      if (!gig && (mode === 'play' || mode === 'pause' || mode === 'results')) openRiff();
+      if (!gig && lessonRun === null && (mode === 'play' || mode === 'pause' || mode === 'results')) openRiff();
       break;
     case 'ArrowUp':
     case 'ArrowDown':
@@ -1798,7 +1901,7 @@ window.addEventListener('keydown', (e) => {
       else if (gig && mode === 'tuner') finishTuner();
       else if (gig && mode === 'interlude') nextGigSong();
       else if (gig && mode === 'encore') finishGig('played');
-      else if (mode === 'career') showMenu();
+      else if (mode === 'career' || mode === 'lessons') showMenu();
       else if (mode === 'library') {
         if (library.cardOpen) library.closeCard();
         else showMenu();
