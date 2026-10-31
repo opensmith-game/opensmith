@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 use opensmith_dsp::fx::resample::resample_fast;
 
+use crate::sfx::{Sfx, Sound};
+
 /// A backing track: interleaved stereo at the engine sample rate. It may carry the song's own
 /// guitar as a separate stem, mixed in at a gain that can change while it plays.
 pub struct Track {
@@ -137,6 +139,11 @@ pub enum PlayerCommand {
     Rate(f64),
     /// Plays track frames `start..end` over and over (Loop Trainer); `None` plays on.
     Loop(Option<(i64, i64)>),
+    /// Mixes `sound` over everything at `gain`, now or when the track reaches frame `at` (a
+    /// count-in); a load or a seek drops the sounds still waiting.
+    Sound { sound: Sound, gain: f32, at: Option<i64> },
+    /// The looping background sound (the crowd), its gain gliding to `gain`; `None` fades it out.
+    Bed { sound: Option<Sound>, gain: f32 },
 }
 
 /// Slowest playback speed.
@@ -247,6 +254,7 @@ pub(crate) struct Player {
     gain: f32,
     generation: u32,
     stretch: Stretch,
+    sfx: Sfx,
 }
 
 impl Player {
@@ -263,6 +271,7 @@ impl Player {
             gain: 1.0,
             generation: 0,
             stretch: Stretch::new(sample_rate),
+            sfx: Sfx::new(sample_rate),
         }
     }
 
@@ -281,6 +290,7 @@ impl Player {
                     self.loops = 0;
                     self.looping = None;
                     self.stretch.join(Join::Cut);
+                    self.sfx.cut_waiting();
                 }
                 PlayerCommand::Seek { frame, generation } => {
                     self.pos = frame as f64;
@@ -288,6 +298,7 @@ impl Player {
                     self.generation = generation;
                     self.loops = 0;
                     self.stretch.join(Join::Cut);
+                    self.sfx.cut_waiting();
                 }
                 PlayerCommand::Play => self.playing = !self.ended,
                 PlayerCommand::Pause => self.playing = false,
@@ -300,6 +311,8 @@ impl Player {
                     }
                 }
                 PlayerCommand::Loop(bounds) => self.looping = bounds.filter(|(a, b)| b > a),
+                PlayerCommand::Sound { sound, gain, at } => self.sfx.play(sound, gain, at),
+                PlayerCommand::Bed { sound, gain } => self.sfx.bed(sound, gain),
             }
         }
         let clock = PlayerClock {
@@ -312,9 +325,16 @@ impl Player {
             rate: self.rate,
             loops: self.loops,
         };
-        if !self.playing {
-            return clock;
+        let track = self.playing.then_some((self.pos, self.rate));
+        if self.playing {
+            self.play_track(out, channels);
         }
+        self.sfx.render(out, channels, track);
+        clock
+    }
+
+    /// Adds the track from the current position to `out`.
+    fn play_track(&mut self, out: &mut [f32], channels: usize) {
         let gain = self.gain;
         for frame in out.chunks_mut(channels.max(1)) {
             if let Some((a, b)) = self.looping
@@ -345,7 +365,6 @@ impl Player {
             self.playing = false;
             self.ended = true;
         }
-        clock
     }
 }
 

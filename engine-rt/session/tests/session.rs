@@ -599,3 +599,22 @@ fn the_virtual_guitarist_is_judged_fairly() {
     let (right, wrong) = beginner.fairness();
     assert!(right >= 0.6 && wrong >= 0.8, "a beginner: {right} of the right playing counted, {wrong} of the wrong refused");
 }
+
+#[test]
+fn sounds_are_played_at_the_output_rate_by_name() {
+    let Bridge { mut output, monitor, .. } = Bridge::new(&EngineConfig::default(), 1, 2, 0.0);
+    let mut session = Session::new(Sim { monitor, now: Arc::new(AtomicU64::new(0)) }, config());
+    // Made at 24 kHz, heard at 48 kHz: twice as many frames, the same level.
+    session.add_sound("tick".into(), 24_000.0, vec![1.0; 100]);
+    session.play_sound("tick", 0.5, None);
+    session.play_sound("unknown", 1.0, None);
+    let mut out = vec![0f32; BLOCK * 2];
+    let mut left = Vec::new();
+    for k in 0..10u64 {
+        output.process(&mut out, k * 1_333_333, 5_000_000);
+        left.extend(out.chunks(2).map(|f| f[0]));
+    }
+    let loud = left.iter().filter(|v| (**v - 0.5).abs() < 0.05).count();
+    assert!((180..=200).contains(&loud), "{loud} frames at the sound's level");
+    assert!(left[260..].iter().all(|v| v.abs() < 1e-3), "and nothing after it");
+}

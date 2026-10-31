@@ -61,7 +61,7 @@ describe('guitar settings', () => {
   });
 
   it('sends perceptual volumes as gains, the master on all', () => {
-    const v = { inputGainDb: 2, inputOffsetMs: 25, visualOffsetMs: 0, masterVolume: 1, backingVolume: 0.5, monitorVolume: 1, stemVolume: 0 };
+    const v = { inputGainDb: 2, inputOffsetMs: 25, visualOffsetMs: 0, masterVolume: 1, backingVolume: 0.5, monitorVolume: 1, stemVolume: 0, effectsVolume: 0.7, crowdVolume: 0.8 };
     expect(engineSettings(v)).toEqual({ inputGainDb: 2, inputOffsetMs: 25, backingVolume: 0.25, monitorVolume: 1, stemVolume: 0 });
     const half = engineSettings({ ...v, inputGainDb: 0, inputOffsetMs: 0, masterVolume: 0.5, backingVolume: 1, monitorVolume: 0.8, stemVolume: 0.6 });
     expect(half.backingVolume).toBeCloseTo(0.25);

@@ -2,6 +2,7 @@ import type { CareerStore } from '../career/career';
 import type { Chart } from '../chart';
 import type { GameEvent } from '../game/types';
 import type { ProgressStore } from '../progress';
+import type { SoundName } from '../sounds';
 
 export interface SongEntry {
   /** Chart path inside the library, e.g. "demo/chart/song_chart.json". */
@@ -95,4 +96,11 @@ export interface Engine {
   frame(nowMs: number): Frame;
   /** An image URL for the song's picture, null without one. */
   coverUrl(song: SongEntry): Promise<string | null>;
+  /** Keeps a sound to play later by name: mono samples at `rate` Hz. */
+  addSound(name: SoundName, rate: number, samples: Float32Array): void;
+  /** Plays a sound kept before at linear `gain`, now or at song time `at` (a count-in); a seek
+   * or a load drops the ones still waiting. */
+  sound(name: SoundName, gain: number, at?: number): void;
+  /** The looping background sound (the crowd) glides to `gain`; null fades it out. */
+  bed(name: SoundName | null, gain: number): void;
 }

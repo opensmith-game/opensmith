@@ -3,6 +3,7 @@ import { parseChart, type Chart } from '../chart';
 import { DEFAULT_LOCAL, LocalGame, type LocalGameConfig } from '../game/local';
 import type { GameEvent } from '../game/types';
 import { localProgress } from '../progress';
+import type { SoundName } from '../sounds';
 import type { Engine, Frame, RiffLoop, SongEntry } from './types';
 
 /**
@@ -51,8 +52,67 @@ export class DemoEngine implements Engine {
   private ended = false;
   private rate = 1;
   private riff: RiffLoop | null = null;
+  private sounds = new Map<SoundName, AudioBuffer>();
+  /** Sounds waiting for their song time (count-in), dropped when the song moves. */
+  private waiting = new Set<AudioBufferSourceNode>();
+  private room: { name: SoundName; src: AudioBufferSourceNode; gain: GainNode } | null = null;
 
   constructor(private readonly root = '/library/') {}
+
+  addSound(name: SoundName, rate: number, samples: Float32Array): void {
+    this.ctx ??= new AudioContext({ latencyHint: 'interactive' });
+    const buffer = this.ctx.createBuffer(1, samples.length, rate);
+    buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+    this.sounds.set(name, buffer);
+  }
+
+  sound(name: SoundName, gain: number, at?: number): void {
+    const { ctx } = this;
+    const buffer = this.sounds.get(name);
+    if (!ctx || !buffer || ctx.state !== 'running' || (at !== undefined && !this.running)) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const level = ctx.createGain();
+    level.gain.value = gain;
+    src.connect(level).connect(ctx.destination);
+    let when = ctx.currentTime;
+    if (at !== undefined) {
+      when += Math.max(0, (at - this.time(performance.now())) / this.rate);
+      this.waiting.add(src);
+      src.onended = () => this.waiting.delete(src);
+    }
+    src.start(when);
+  }
+
+  bed(name: SoundName | null, gain: number): void {
+    const { ctx } = this;
+    const buffer = name ? this.sounds.get(name) : undefined;
+    if (!ctx) return;
+    if (this.room && (this.room.name !== name || !buffer)) {
+      const old = this.room;
+      old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      old.src.stop(ctx.currentTime + 3);
+      this.room = null;
+    }
+    if (!name || !buffer) return;
+    if (!this.room) {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const level = ctx.createGain();
+      level.gain.value = 0;
+      src.connect(level).connect(ctx.destination);
+      src.start();
+      this.room = { name, src, gain: level };
+    }
+    this.room.gain.gain.setTargetAtTime(gain, ctx.currentTime, 0.4);
+  }
+
+  /** The song moved: the count-in clicks still waiting are dropped. */
+  private cutWaiting(): void {
+    for (const src of this.waiting) src.stop();
+    this.waiting.clear();
+  }
 
   get playing(): boolean {
     return this.running;
@@ -126,6 +186,7 @@ export class DemoEngine implements Engine {
   }
 
   pause(): void {
+    this.cutWaiting();
     if (!this.running) return;
     this.held = this.time(performance.now());
     this.running = false;

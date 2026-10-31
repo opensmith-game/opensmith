@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use opensmith_audio::{Monitor, PlayerClock, PlayerCommand, StreamInfo, Track, MAX_RATE, MIN_RATE};
+use opensmith_audio::{Monitor, PlayerClock, PlayerCommand, Sound, StreamInfo, Track, MAX_RATE, MIN_RATE};
+use opensmith_dsp::fx::resample::resample_fast;
 use opensmith_dsp::notefeat::{NoteFeatures, BINS, HOP, PER_SEMITONE, WINDOW};
 use opensmith_dsp::notenet::NoteNet;
 use opensmith_dsp::{ChainParams, ChordConfig, ChordVerifier, TrackerEvent, TunerAnalyzer, TunerConfig};
@@ -113,6 +114,7 @@ pub struct Session<B: AudioBackend> {
     loops_seen: u32,
     /// What was set on the audio engine, applied again to a new one (another output).
     applied: Applied,
+    sounds: Sounds,
     /// Where takes go (`record`), and the one being recorded.
     record_to: Option<PathBuf>,
     recording: Option<Recording>,
@@ -188,6 +190,17 @@ fn strummed(first: i32, probs: &[f32], pitches: &[i32]) -> bool {
     4 * heard >= 3 * pitches.len() && !foreign
 }
 
+/// Sounds the session may be asked to play over the music (interface, crowd): mono at their
+/// own rate as given, and stereo at the output's rate as it plays them.
+#[derive(Default)]
+struct Sounds {
+    given: HashMap<String, (f64, Vec<f32>)>,
+    ready: HashMap<String, Sound>,
+    ready_rate: f64,
+    /// The background sound and its gain, played again on a new output device.
+    bed: Option<(String, f32)>,
+}
+
 #[derive(Clone, Copy, Default)]
 struct Applied {
     input_gain: Option<f32>,
@@ -230,6 +243,7 @@ impl<B: AudioBackend> Session<B> {
             riff: None,
             loops_seen: 0,
             applied: Applied::default(),
+            sounds: Sounds::default(),
             record_to: None,
             recording: None,
             saving: Vec::new(),
@@ -273,7 +287,48 @@ impl<B: AudioBackend> Session<B> {
         if rate != 1.0 {
             monitor.send(PlayerCommand::Rate(rate));
         }
+        if let Some((name, gain)) = self.sounds.bed.clone() {
+            self.set_bed(Some(name), gain);
+        }
         old
+    }
+
+    /// Keeps `samples` (mono, `rate` Hz) to play as `name`, replacing any sound of that name.
+    pub fn add_sound(&mut self, name: String, rate: f64, samples: Vec<f32>) {
+        self.sounds.ready.remove(&name);
+        self.sounds.given.insert(name, (rate, samples));
+    }
+
+    /// The sound `name` as the output plays it (resampled once for each output rate).
+    fn sound(&mut self, name: &str) -> Option<Sound> {
+        let sr = self.sample_rate;
+        if self.sounds.ready_rate != sr {
+            self.sounds.ready.clear();
+            self.sounds.ready_rate = sr;
+        }
+        if let Some(s) = self.sounds.ready.get(name) {
+            return Some(s.clone());
+        }
+        let (rate, mono) = self.sounds.given.get(name)?;
+        let mono = if (rate - sr).abs() < 0.5 { mono.clone() } else { resample_fast(mono, *rate as f32, sr as f32, 16) };
+        let sound: Sound = mono.iter().flat_map(|&v| [v, v]).collect::<Vec<f32>>().into();
+        self.sounds.ready.insert(name.to_string(), sound.clone());
+        Some(sound)
+    }
+
+    /// Plays the sound `name` at linear `gain`, now or at song time `at` (a count-in).
+    pub fn play_sound(&mut self, name: &str, gain: f32, at: Option<f64>) {
+        let at = at.map(|t| self.frame_of(t));
+        if let Some(sound) = self.sound(name) {
+            self.backend.monitor().send(PlayerCommand::Sound { sound, gain, at });
+        }
+    }
+
+    /// The looping background sound (the crowd) glides to `gain`; `None` fades it out.
+    pub fn set_bed(&mut self, name: Option<String>, gain: f32) {
+        let sound = name.as_deref().and_then(|n| self.sound(n));
+        self.sounds.bed = name.filter(|_| sound.is_some()).map(|n| (n, gain));
+        self.backend.monitor().send(PlayerCommand::Bed { sound, gain });
     }
 
     /// The guitar's sound: amp model, knobs, effects.

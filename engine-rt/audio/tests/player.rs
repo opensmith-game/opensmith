@@ -403,3 +403,60 @@ fn a_transposed_track_keeps_its_tempo_and_its_attacks_where_they_were() {
         assert!((onset - 1.0).abs() < 0.012, "{semitones:+} semitones: the note starts at {onset:.4} s");
     }
 }
+
+/// A sound: `frames` frames of `value` on both channels.
+fn flat(frames: usize, value: f32) -> opensmith_audio::Sound {
+    vec![value; 2 * frames].into()
+}
+
+#[test]
+fn a_sound_plays_at_once_over_everything_even_without_a_song() {
+    let mut b = bridge();
+    b.monitor.send(PlayerCommand::Sound { sound: flat(100, 0.5), gain: 0.5, at: None });
+    let left = run(&mut b, 0, 3);
+    assert!(left[..100].iter().all(|&v| (v - 0.25).abs() < 1e-9));
+    assert!(left[100..].iter().all(|&v| v == 0.0));
+    // Over a playing track, the two add up.
+    b.monitor.send(PlayerCommand::Load { track: Some(ramp(10_000)), frame: 0, generation: 1 });
+    b.monitor.send(PlayerCommand::Play);
+    b.monitor.send(PlayerCommand::Sound { sound: flat(10, 1.0), gain: 1.0, at: None });
+    let left = run(&mut b, 3, 1);
+    assert!((left[5] - (1.0 + 5e-6)).abs() < 1e-6);
+    assert!((left[20] - 20e-6).abs() < 1e-9);
+}
+
+#[test]
+fn a_count_in_click_lands_on_its_frame_and_a_seek_drops_it() {
+    let mut b = bridge();
+    let lead = 3 * BLOCK as i64;
+    b.monitor.send(PlayerCommand::Load { track: Some(ramp(5_000)), frame: -lead, generation: 1 });
+    // Waiting while paused: nothing yet.
+    b.monitor.send(PlayerCommand::Sound { sound: flat(4, 1.0), gain: 1.0, at: Some(-lead + 70) });
+    assert!(run(&mut b, 0, 2).iter().all(|&v| v == 0.0));
+    b.monitor.send(PlayerCommand::Play);
+    let left = run(&mut b, 2, 3);
+    let heard: Vec<usize> = left.iter().enumerate().filter(|(_, v)| **v > 0.5).map(|(i, _)| i).collect();
+    assert_eq!(heard, vec![70, 71, 72, 73]);
+    // Sent for later, then the song moves: it never plays.
+    b.monitor.send(PlayerCommand::Sound { sound: flat(4, 1.0), gain: 1.0, at: Some(4_000) });
+    b.monitor.send(PlayerCommand::Seek { frame: 0, generation: 2 });
+    assert!(run(&mut b, 5, 80).iter().all(|&v| v < 0.5));
+}
+
+#[test]
+fn the_crowd_loops_glides_to_its_level_and_fades_out() {
+    let mut b = bridge();
+    let crowd = flat(1_000, 1.0);
+    b.monitor.send(PlayerCommand::Bed { sound: Some(crowd.clone()), gain: 0.5 });
+    let left = run(&mut b, 0, 1_500); // 2 s
+    assert!(left[10] > 0.0 && left[10] < 0.01, "it rises from silence: {}", left[10]);
+    let end = *left.last().unwrap();
+    assert!((end - 0.5).abs() < 0.01, "then holds its level, looping: {end}");
+    // The same crowd louder: no restart, a glide.
+    b.monitor.send(PlayerCommand::Bed { sound: Some(crowd), gain: 1.0 });
+    let left = run(&mut b, 1_500, 1_500);
+    assert!(left[0] > 0.49 && (left.last().unwrap() - 1.0).abs() < 0.01);
+    b.monitor.send(PlayerCommand::Bed { sound: None, gain: 0.0 });
+    let left = run(&mut b, 3_000, 4_000);
+    assert_eq!(*left.last().unwrap(), 0.0, "faded out and stopped");
+}

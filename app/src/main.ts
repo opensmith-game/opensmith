@@ -67,6 +67,8 @@ import { award, careerTrophies, perfectSolo, songTrophies, TROPHIES, type GigFea
 import { announce, showTrophies } from './trophy-board';
 import { lessonChart, lessons, loadLessons, nextLesson, passed, recordLesson } from './lessons';
 import { LessonsScreen } from './lessons-screen';
+import { interfaceSounds, SoundBoard } from './sfx';
+import { SOUND_NAMES, type SoundName } from './sounds';
 import { settleChallenge, TIERS, type Challenge } from './career/challenge';
 import { levelOf } from './career/difficulty';
 import { learn, rehearse, REHEARSAL, starter } from './career/repertoire';
@@ -144,6 +146,21 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 
 const settings = loadSettings();
 const engine: Engine = isTauri() ? new TauriEngine() : new DemoEngine();
+const sfx = new SoundBoard(engine);
+
+/** The sounds, made away from the screen's thread and handed to the engine as they come. */
+function makeSounds(): void {
+  try {
+    const worker = new Worker(new URL('./sound-worker.ts', import.meta.url), { type: 'module' });
+    let left = SOUND_NAMES.length;
+    worker.onmessage = (e: MessageEvent<{ name: SoundName; rate: number; samples: Float32Array }>) => {
+      engine.addSound(e.data.name, e.data.rate, e.data.samples);
+      if (--left === 0) worker.terminate();
+    };
+  } catch (e) {
+    console.warn('sons indisponibles', e);
+  }
+}
 const highway = new Highway($('stage'), { invertStrings: settings.invertStrings, speed: settings.speed, lookahead: 3 });
 // Selects, checkboxes and sliders, everywhere, dressed as stage hardware.
 hardwareControls();
@@ -244,6 +261,8 @@ interface GigRun {
 let career: Career = newCareer();
 let gig: GigRun | null = null;
 let interludeTimer = 0;
+/** The crowd's murmur under a song, against between songs. */
+const ROOM_IN_SONG = 0.35;
 /** Seconds between two songs of a gig; how much a retuning, and a pause, cool the room. */
 const INTERLUDE = 6;
 /** What pauses and retunings cost the crowd, by the career's difficulty. */
@@ -474,6 +493,7 @@ quick.addEventListener('click', (e) => {
 
 /** The volumes where they play: the native engine, or the browser's backing track. */
 function applyVolumes(): void {
+  sfx.setVolumes(settings.effectsVolume, settings.crowdVolume, settings.masterVolume);
   if (engine instanceof TauriEngine) engine.configure(engineSettings(settings));
   if (engine instanceof DemoEngine) engine.setVolume((settings.backingVolume * settings.masterVolume) ** 2);
 }
@@ -972,9 +992,16 @@ function updateMenu(): void {
   $('resumeArt').replaceChildren(coverElement(last.title, last.artist, engine.coverUrl(last), 'resume-cover'));
 }
 
+/** Trophies just earned: announced, with a fanfare. */
+function celebrate(trophies: Trophy[]): void {
+  announce($('trophyToasts'), trophies);
+  if (trophies.length) window.setTimeout(() => sfx.cue('fanfare'), 400);
+}
+
 /** Back to the main menu, from anywhere outside a song. */
 function showMenu(): void {
   if (gig) finishGig('abandoned');
+  sfx.room(null);
   lessonRun = null;
   challengeRun = null;
   studioRun = null;
@@ -1024,6 +1051,7 @@ async function start(id: string, riffOpening = false): Promise<void> {
     chart = await engine.load(id, progress[id]?.levels);
   } catch (e) {
     library.status(t('Impossible d’ouvrir ce morceau : {error}', { error: (e as Error).message }), true);
+    sfx.ui('error');
     return;
   } finally {
     window.clearTimeout(shown);
@@ -1054,6 +1082,7 @@ async function start(id: string, riffOpening = false): Promise<void> {
     gig.tuning = tuning;
     if (step.costs) gig.crowd.cool(stageRules().retune);
     hud.setCrowd(gig.crowd.value);
+    sfx.room(ROOM_IN_SONG * gig.crowd.value);
     if (engine instanceof TauriEngine && (gig.index === 0 || retune)) openTuner(chart);
     else restart();
     return;
@@ -1117,7 +1146,7 @@ const careerScreen = new CareerScreen($('career'), {
         fans: Math.round(out.release.copies * 0.15).toLocaleString(NUMBERS),
       }),
     );
-    announce($('trophyToasts'), earn(careerTrophies(career, null)));
+    celebrate(earn(careerTrophies(career, null)));
     careerScreen.showStudio(career);
   },
   learn: (id) => {
@@ -1192,6 +1221,7 @@ async function startLesson(index: number): Promise<void> {
     chart = await engine.loadLesson(lessonChart(lesson, index));
   } catch (e) {
     notice(t('Impossible d’ouvrir la leçon : {error}', { error: (e as Error).message }));
+    sfx.ui('error');
     return;
   }
   heldTuning = chart.arrangement.tuning.strings;
@@ -1209,6 +1239,10 @@ function lessonVerdict(acc: number, judged: boolean, practice: boolean): void {
   const lesson = list[index];
   if (judged && !practice && !autopiloting()) lessonRecords = recordLesson(lessonRecords, lesson.id, acc);
   const ok = judged && !practice && acc >= lesson.goal;
+  if (ok) {
+    window.setTimeout(() => sfx.cue('fanfare'), 500);
+    sfx.applause(0.4);
+  }
   const pct = (x: number) => t('{n} %', { n: Math.round(x * 100) });
   $('verdict').textContent = ok ? t('Leçon réussie !') : practice ? t('Entraînement au ralenti') : t('Encore un essai !');
   const next = list[index + 1];
@@ -1275,6 +1309,9 @@ function gigSongEnded(): void {
   gig.earned.push(...songEarns(grade, outcome?.masteryAfter ?? 0));
   const notes = view.score.hits + view.score.misses;
   const song: GigSong = { id: currentId ?? '', title: chart.meta.title, grade, accuracy: accuracy(view.score), crowd: gig.crowd.value, notes, seconds: chart.meta.duration };
+  // The room answers the song: as warm as it is.
+  sfx.applause(0.3 + 0.7 * gig.crowd.value);
+  if (gig.crowd.value >= 0.5) sfx.cheer(gig.crowd.value);
   if (gig.encore) {
     gig.encoreSong = song;
     finishGig('played');
@@ -1330,6 +1367,7 @@ function showEncore(): void {
     }),
   );
   highway.celebrate(0.6);
+  sfx.room(0.4 + 0.6 * crowd, 'clapping');
   setMode('encore');
 }
 
@@ -1361,6 +1399,7 @@ function showInterlude(grade: string): void {
         ? t('{tuning} (autre accordage : la salle va refroidir)', { tuning: next.tuning })
         : t('{tuning} (deuxième guitare : la salle ne refroidit pas)', { tuning: next.tuning });
   $('interludeNext').textContent = next ? t('Ensuite : {title} · {tuning}', { title: next.title, tuning }) : '';
+  sfx.room(crowd);
   setMode('interlude');
   let left = INTERLUDE;
   $('interludeCount').textContent = `(${left})`;
@@ -1393,11 +1432,12 @@ function finishGig(outcome: GigOutcome): void {
     run.songs.push({ id: currentId ?? '', title: chart.meta.title, grade: gradeOf(view.score), accuracy: accuracy(view.score), crowd: run.crowd.value, notes, seconds });
   }
   gig = null;
+  sfx.room(null);
   const result = concludeGig(career, run.offer, run.songs, outcome, { encore: run.encoreSong, pauses: run.pauses });
   career = result.career;
   storeCareer();
   const feat: GigFeat = { outcome, satisfaction: result.record.satisfaction, encore: !!result.record.encore };
-  announce($('trophyToasts'), [...run.earned, ...earn(careerTrophies(career, feat))]);
+  celebrate([...run.earned, ...earn(careerTrophies(career, feat))]);
   if (tuner.visible && engine instanceof TauriEngine) engine.setTuner(false);
   tuner.close();
   exitRiff();
@@ -1448,6 +1488,7 @@ function restart(): void {
   applyMaster();
   engine.seek(-LEAD_IN);
   engine.play();
+  sfx.countIn(chart, -LEAD_IN);
   setMode('play');
 }
 
@@ -1558,7 +1599,7 @@ function settleRun(ch: Challenge, run: { failed: boolean; accuracy: number }): v
   const before = career.challenge?.key === ch.key ? career.challenge.tier : 0;
   career = out.career;
   storeCareer();
-  announce($('trophyToasts'), earn(careerTrophies(career, null)));
+  celebrate(earn(careerTrophies(career, null)));
   const line = document.createElement('p');
   line.className = `challenge-result${out.tier ? ` tier-${out.tier}` : ''}`;
   const pct = `${Math.round(run.accuracy * 100)} %`;
@@ -1667,6 +1708,8 @@ function showResults(): void {
   void gradeEl.offsetWidth;
   gradeEl.classList.add('reveal');
   $('verdict').textContent = verdicts[grade];
+  sfx.cue('grade');
+  if (lessonRun === null && playSpeed >= 1) sfx.applause(({ S: 1, A: 0.75, B: 0.5 } as Record<string, number>)[grade] ?? 0);
   // Into the song's progress: levels for next time, records, mastery.
   let records = '';
   // Slowed down, a play is practice: no records, no rehearsal, no trophy.
@@ -1677,7 +1720,7 @@ function showResults(): void {
     // A song of the repertoire played through: a rehearsal; a studio take when recording.
     rehearseSong();
     if (studioRun && studioRun === currentId) settleTake(studioRun, accuracy(view.score));
-    announce($('trophyToasts'), songEarns(grade, outcome?.masteryAfter ?? (currentId ? (progress[currentId]?.mastery ?? 0) : 0)));
+    celebrate(songEarns(grade, outcome?.masteryAfter ?? (currentId ? (progress[currentId]?.mastery ?? 0) : 0)));
   }
   if (outcome) {
     const lines: Record<string, string> = {
@@ -1953,7 +1996,14 @@ function frame(ms: number): void {
     for (const e of f.events) {
       if (e.type === 'takeSaved') hud.toast({ kind: 'phrase', title: t('Prise enregistrée'), detail: formatTime(e.seconds) });
     }
-    for (const t of view.drainToasts()) hud.toast(t);
+    for (const t of view.drainToasts()) {
+      hud.toast(t);
+      if (mode !== 'play') continue;
+      if (t.kind === 'streak') {
+        sfx.cue('streak');
+        if (gig) sfx.cheer(0.25 + 0.5 * gig.crowd.value);
+      } else if (t.kind === 'up' || t.kind === 'mastered' || t.kind === 'perfect') sfx.cue('levelUp');
+    }
     for (const p of view.drainPasses()) onPass(p);
     for (const p of view.drainPhrases()) onAttackPhrase(p);
     hud.update(view, f.time);
@@ -1962,6 +2012,7 @@ function frame(ms: number): void {
     if (gig && mode === 'play') {
       for (const e of f.events) if (e.type === 'hit' || e.type === 'miss') gig.crowd.note(e.type === 'hit');
       booed = gig.crowd.update(dt);
+      sfx.room(ROOM_IN_SONG * gig.crowd.value);
       hud.setCrowd(gig.crowd.value);
       highway.setCrowd(gig.crowd.value);
     }
@@ -1988,6 +2039,10 @@ function frame(ms: number): void {
 }
 
 syncSettings();
+interfaceSounds(document, sfx, () => mode !== 'play');
+// The browser lets sound start only after a first gesture.
+document.addEventListener('pointerdown', () => engine.unlock(), { once: true });
+window.setTimeout(makeSounds, 300);
 applyVolumes();
 setMode('menu');
 const progressLoaded = engine.progress

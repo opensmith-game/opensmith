@@ -76,6 +76,12 @@ pub enum Command {
     Autopilot(bool),
     /// Records what the guitar plays during songs into takes under this folder (`None`: stop).
     Record(Option<std::path::PathBuf>),
+    /// A sound to play on demand over the music (interface, crowd): mono at `rate` Hz.
+    AddSound { name: String, rate: f64, samples: Vec<f32> },
+    /// Plays a sound at linear `gain`, now or at song time `at` (a count-in on the beat).
+    Sound { name: String, gain: f32, at: Option<f64> },
+    /// The looping background sound (the crowd) glides to `gain`; `None` fades it out.
+    Bed { name: Option<String>, gain: f32 },
 }
 
 /// The devices a backend is built on: name fragments, `None` for the automatic choice.
@@ -243,6 +249,9 @@ where
                 Ok(Command::MonitorGain(g)) => session.set_monitor_gain(g),
                 Ok(Command::Rate(r)) => session.set_rate(r),
                 Ok(Command::Riff(riff)) => session.set_riff(riff),
+                Ok(Command::AddSound { name, rate, samples }) => session.add_sound(name, rate, samples),
+                Ok(Command::Sound { name, gain, at }) => session.play_sound(&name, gain, at),
+                Ok(Command::Bed { name, gain }) => session.set_bed(name, gain),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
             }

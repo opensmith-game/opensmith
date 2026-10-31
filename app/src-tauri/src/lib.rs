@@ -539,6 +539,31 @@ fn load_lesson(app: State<'_, App>, json: String) -> Result<serde_json::Value, S
     Ok(value)
 }
 
+/// A sound the app made (interface, crowd), to play later by name: the body holds its mono
+/// samples (f32, little-endian), the headers its `name` and `rate` (Hz).
+#[tauri::command]
+fn add_sound(app: State<'_, App>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("son attendu en binaire".into()) };
+    let header = |key: &str| request.headers().get(key).and_then(|v| v.to_str().ok()).map(str::to_string);
+    let name = header("name").ok_or("son sans nom")?;
+    let rate: f64 = header("rate").and_then(|r| r.parse().ok()).ok_or("son sans fréquence")?;
+    let samples = bytes.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
+    app.session.send(Command::AddSound { name, rate, samples });
+    Ok(())
+}
+
+/// Plays a sound added before at linear `gain`, now or at song time `at`.
+#[tauri::command]
+fn play_sound(app: State<'_, App>, name: String, gain: f32, at: Option<f64>) {
+    app.session.send(Command::Sound { name, gain, at });
+}
+
+/// The looping background sound (the crowd) glides to `gain`; none fades it out.
+#[tauri::command]
+fn set_bed(app: State<'_, App>, name: Option<String>, gain: f32) {
+    app.session.send(Command::Bed { name, gain });
+}
+
 /// The player's progress (scores, phrase levels, mastery), kept in the library folder.
 #[tauri::command]
 fn read_progress(app: State<'_, App>) -> String {
@@ -874,6 +899,9 @@ pub fn run() {
             library,
             load_song,
             load_lesson,
+            add_sound,
+            play_sound,
+            set_bed,
             play,
             pause,
             seek,

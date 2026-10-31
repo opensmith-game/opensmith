@@ -15,6 +15,9 @@ export interface GuitarValues {
   monitorVolume: number;
   /** The song's own guitar, when its import kept it apart (MP3 imports): silent by default. */
   stemVolume: number;
+  /** The interface's clicks and the game's cues; the crowd. */
+  effectsVolume: number;
+  crowdVolume: number;
 }
 
 export const DEFAULT_GUITAR: GuitarValues = {
@@ -25,6 +28,8 @@ export const DEFAULT_GUITAR: GuitarValues = {
   backingVolume: 0.85,
   monitorVolume: 0.9,
   stemVolume: 0,
+  effectsVolume: 0.7,
+  crowdVolume: 0.8,
 };
 
 export const toDb = (x: number): number => (x > 0 ? 20 * Math.log10(x) : -Infinity);
@@ -97,6 +102,8 @@ const TEMPLATE = `
     <label class="row">Master <input type="range" min="0" max="1" step="0.01" data-field="masterVolume" /><output data-out="masterVolume"></output></label>
     <label class="row">Backing track <input type="range" min="0" max="1" step="0.01" data-field="backingVolume" /><output data-out="backingVolume"></output></label>
     <label class="row" data-el="monitorRow">${t('Guitare')} <input type="range" min="0" max="1" step="0.01" data-field="monitorVolume" /><output data-out="monitorVolume"></output></label>
+    <label class="row">${t('Effets sonores')} <input type="range" min="0" max="1" step="0.01" data-field="effectsVolume" /><output data-out="effectsVolume"></output></label>
+    <label class="row">${t('Public')} <input type="range" min="0" max="1" step="0.01" data-field="crowdVolume" /><output data-out="crowdVolume"></output></label>
     <p class="help" data-el="monitorHelp" hidden>${t('Sans câble guitare USB, le retour de la guitare est coupé pour éviter le larsen.')}</p>
   </section>
   <section data-part="amp" data-tabs="audio">
@@ -352,6 +359,8 @@ export class GuitarSettings {
     out('masterVolume', t('{n} %', { n: Math.round((v.masterVolume ?? 1) * 100) }));
     out('backingVolume', t('{n} %', { n: Math.round(v.backingVolume * 100) }));
     out('monitorVolume', t('{n} %', { n: Math.round(v.monitorVolume * 100) }));
+    out('effectsVolume', t('{n} %', { n: Math.round(v.effectsVolume * 100) }));
+    out('crowdVolume', t('{n} %', { n: Math.round(v.crowdVolume * 100) }));
   }
 
   private meter(peak: number, nowMs: number): void {

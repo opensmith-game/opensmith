@@ -10,11 +10,13 @@ pub mod devices;
 pub mod engine;
 pub mod latency;
 pub mod player;
+pub mod sfx;
 
 pub use devices::{is_rocksmith_name, list_devices, DeviceInfo, InputKind};
 pub use clock::host_now_ns;
 pub use engine::{Bridge, Engine, EngineConfig, InputSide, Monitor, OutputSide, StatsSnapshot, StreamInfo, ERROR_KINDS};
 pub use player::{PlayerClock, PlayerCommand, TapBlock, Track, MAX_RATE, MIN_RATE, TAP_BLOCK};
+pub use sfx::Sound;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AudioError {

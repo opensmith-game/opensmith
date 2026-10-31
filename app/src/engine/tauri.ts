@@ -6,6 +6,7 @@ import type { AmpSettings } from '../amp';
 import type { CareerStore } from '../career/career';
 import type { Progress, ProgressStore } from '../progress';
 import type { Engine, Frame, RiffLoop, SongEntry } from './types';
+import type { SoundName } from '../sounds';
 
 interface PollView {
   time: number;
@@ -130,6 +131,19 @@ export class TauriEngine implements Engine {
     this.clock = new ClockSync();
     this.running = false;
     return chart;
+  }
+
+  addSound(name: SoundName, rate: number, samples: Float32Array): void {
+    const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
+    invoke('add_sound', bytes, { headers: { name, rate: String(rate) } }).catch((e) => console.error('son', name, e));
+  }
+
+  sound(name: SoundName, gain: number, at?: number): void {
+    void invoke('play_sound', { name, gain, at: at ?? null });
+  }
+
+  bed(name: SoundName | null, gain: number): void {
+    void invoke('set_bed', { name, gain });
   }
 
   play(): void {
