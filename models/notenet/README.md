@@ -10,9 +10,15 @@ on the same features as here (`engine-rt/dsp/src/notefeat.rs`).
 - **Training**: pieces the composer invents (`engine-rt/session/src/composer.rs`: strummed
   chords, arpeggios, riffs, scale lines with hammer-ons, slides, bends, harmonics), played by the
   virtual guitarist on single notes recorded from real guitars in
-  [Guitar-TECHS](https://guitar-techs.github.io) (CC BY 4.0).
-- **Test**: the real playing of Guitar-TECHS (chords, scales, techniques, excerpts), its
-  annotations cleaned of the MIDI pickup's ghosts and moved onto the real attacks.
+  [Guitar-TECHS](https://guitar-techs.github.io) (CC BY 4.0); and the real playing of
+  Guitar-TECHS (chords, scales, techniques, excerpts), its annotations cleaned of the MIDI
+  pickup's ghosts and moved onto the real attacks, 30 % of every batch.
+- **Test**: one player's real playing, the network trained on the two others: 77.9 % of the
+  notes found (75.5 % trained on invented pieces only). The weights shipped learnt from all
+  three.
+- **Your own guitar**: the recording sessions of the Lessons screen give takes of the player's
+  guitar and cable; `models/notenet/own_takes.py` moves each note onto its real attack and
+  leaves out the ones not played, ready for the sample bank and for training.
 
 ## Rebuilding it
 
@@ -30,8 +36,10 @@ on the same features as here (`engine-rt/dsp/src/notefeat.rs`).
    compares against:
 
    ```bash
-   uv run --project pipeline-ingest python models/notenet/train.py <data> engine-rt/dsp/assets/notenet.bin 20000
+   uv run --project pipeline-ingest python models/notenet/train.py <data> engine-rt/dsp/assets/notenet.bin 20000 --learn-from P1,P2,P3
    ```
+
+   `--learn-from P1,P3` keeps player 2 for the test; `--measure <weights>` only measures.
 
 4. Measure the game's judging with it: `opensmith-simulate --takes <takes>` (real playing) and
    `opensmith-simulate --real-notes <takes> --player good <charts>`.
