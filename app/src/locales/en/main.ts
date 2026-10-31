@@ -247,6 +247,12 @@ export const MAIN: Record<string, string> = {
   'Trop bas': 'Too low',
   'Mauvais accord': 'Wrong chord',
   'Prise enregistrée': 'Take saved',
+  'Joué en {tuning}': 'Played in {tuning}',
+  'Morceau décalé de {shift} demi-ton': 'Song shifted {shift} semitone',
+  'Morceau décalé de {shift} demi-tons': 'Song shifted {shift} semitones',
+  'Celui de chaque morceau (je réaccorde)': 'Each song’s (I retune)',
+  'Ma guitare reste accordée en': 'My guitar stays tuned in',
+  'Les morceaux à quelques demi-tons de cet accordage sont décalés pour lui : pas besoin de réaccorder.': 'Songs a few semitones away from this tuning are shifted to it: no need to retune.',
 
   // Results: why the notes were missed, the latency left
   'Notes ratées : {list}': 'Missed notes: {list}',

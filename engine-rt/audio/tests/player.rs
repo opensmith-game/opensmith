@@ -373,3 +373,33 @@ fn the_songs_own_guitar_comes_in_at_its_gain_while_playing() {
     let past = run(&mut b, 48, 10);
     assert!(past.iter().all(|&v| (v - 0.1).abs() < 1e-6), "past the stem's end: the backing alone");
 }
+
+/// Frequency of a sine from its rising zero crossings over `[a, b)` frames (left channel).
+fn frequency(track: &Track, a: usize, b: usize) -> f64 {
+    let s = track.samples();
+    let left: Vec<f32> = (a..b).map(|i| s[2 * i]).collect();
+    let ups: Vec<usize> = (1..left.len()).filter(|&i| left[i - 1] < 0.0 && left[i] >= 0.0).collect();
+    (ups.len() - 1) as f64 * SR / (ups[ups.len() - 1] - ups[0]) as f64
+}
+
+#[test]
+fn a_transposed_track_keeps_its_tempo_and_its_attacks_where_they_were() {
+    // 220 Hz from 1 s to 2 s, silence around.
+    let frames = (3.0 * SR) as usize;
+    let data: Vec<f32> = (0..frames)
+        .flat_map(|i| {
+            let t = i as f64 / SR;
+            let v = if (1.0..2.0).contains(&t) { 0.5 * (2.0 * std::f64::consts::PI * 220.0 * t).sin() as f32 } else { 0.0 };
+            [v, v]
+        })
+        .collect();
+    let track = Track::from_interleaved(&data, 2);
+    for (semitones, hz) in [(2.0, 246.94), (-1.0, 207.65), (0.5, 226.45)] {
+        let up = track.transposed(semitones, SR);
+        assert_eq!(up.frames(), track.frames(), "same length");
+        let f = frequency(&up, (1.2 * SR) as usize, (1.8 * SR) as usize);
+        assert!((f - hz).abs() < 0.5, "{semitones:+} semitones: {f:.2} Hz, not {hz}");
+        let onset = up.samples().chunks(2).position(|f| f[0].abs() > 0.05).unwrap() as f64 / SR;
+        assert!((onset - 1.0).abs() < 0.012, "{semitones:+} semitones: the note starts at {onset:.4} s");
+    }
+}

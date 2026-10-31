@@ -109,8 +109,15 @@ export class TauriEngine implements Engine {
     return invoke<AudioStatus>('audio_status');
   }
 
+  /** How the guitar stays tuned between songs (null: retuned for each song). */
+  guitar: { name: string; strings: readonly number[] } | null = null;
+  /** Semitones the last song loaded was transposed by, to fit the guitar (0: as recorded). */
+  transposed = 0;
+
   async load(id: string, levels: Record<string, number> = {}): Promise<Chart> {
-    const chart = parseChart(await invoke('load_song', { id, startLevel: this.startLevel, levels, dynamic: this.dynamic }));
+    const raw = await invoke<{ transposed?: number }>('load_song', { id, startLevel: this.startLevel, levels, dynamic: this.dynamic, guitar: this.guitar });
+    this.transposed = raw.transposed ?? 0;
+    const chart = parseChart(raw);
     this.clock = new ClockSync();
     this.running = false;
     return chart;

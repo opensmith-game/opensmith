@@ -144,6 +144,8 @@ Puis ouvrir http://localhost:1420. Les morceaux sont ceux de `out/` (créés par
 
 **Morceaux** : tape pour chercher (titre, artiste ou album, avec ou sans accents ; `/` pour y aller), trie par derniers joués, titre, artiste ou maîtrise, filtre par accordage ou par origine des notes : **Tablature** (Guitar Pro calée sur l'enregistrement), **Chart** (importé par un plugin), **IA** (transcrit depuis le MP3), **Partition** (tablature sans audio). Un clic ouvre la fiche du morceau (records, maîtrise par phrase) avec Jouer et Loop Trainer ; Entrée joue, Échap ferme la fiche puis revient au menu.
 
+**Sans réaccorder** : Réglages → Jeu → « Ma guitare reste accordée en » choisit l'accordage où ta guitare reste. Les morceaux qui en sont à quelques demi-tons (toutes les cordes décalées d’autant, 5 au plus) ou enregistrés hors du La 440 sont transposés à son accordage au chargement : même tempo, mêmes cases sur la partition. Au-delà de deux demi-tons, le son se dégrade un peu.
+
 **Prises** : Réglages → Jeu → « Enregistrer ma guitare pendant les morceaux » garde chaque partie jouée au câble dans le dossier `.takes` de la bibliothèque (un dossier par partie, du lancement ou d'un saut à la fin ; pas le Loop Trainer ni le ralenti). Pour les rejouer dans le moteur tel qu'il est maintenant et comparer au score en direct :
 
 ```bash

@@ -187,6 +187,10 @@ pub struct HandShape {
     pub end: f64,
 }
 
+/// Songs further than this many semitones from the guitar's tuning are not transposed: the
+/// audio would suffer.
+pub const MAX_TRANSPOSE: i32 = 5;
+
 impl Chart {
     pub fn from_json(text: &str) -> Result<Chart, ChartError> {
         let chart: Chart = serde_json::from_str(text)?;
@@ -212,6 +216,30 @@ impl Chart {
     /// MIDI pitch of a fretted position (frets are absolute; the capo fret plays the "open" note).
     pub fn pitch(&self, string: u8, fret: u8) -> i32 {
         self.arrangement.tuning.strings[string as usize] + fret as i32
+    }
+
+    /// Plays the chart on a guitar tuned `strings` (called `name`) instead of retuning it: when
+    /// the chart's tuning is that one moved by the same number of semitones on every string (at
+    /// most `MAX_TRANSPOSE`), or the recording is off A440, the chart takes the guitar's tuning
+    /// (same frets) and the song's audio is to be transposed by the semitones returned. `None`:
+    /// nothing to change, or not possible (another string layout, another string count).
+    pub fn retune_to(&mut self, strings: &[i32], name: &str) -> Option<f64> {
+        let tuning = &mut self.arrangement.tuning;
+        if strings.len() != tuning.strings.len() {
+            return None;
+        }
+        let k = tuning.strings[0] - strings[0];
+        if tuning.strings.iter().zip(strings).any(|(a, b)| a - b != k) || k.abs() > MAX_TRANSPOSE {
+            return None;
+        }
+        let shift = -(k as f64 + tuning.cents / 100.0);
+        if shift.abs() < 0.05 {
+            return None;
+        }
+        tuning.strings = strings.to_vec();
+        tuning.name = name.to_string();
+        tuning.cents = 0.0;
+        Some(shift)
     }
 
     /// Pitches of a chord template, low string first.

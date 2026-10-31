@@ -88,6 +88,14 @@ struct PollView {
     rate: f64,
 }
 
+/// How the player's guitar stays tuned between songs: songs a few semitones away are
+/// transposed to it instead of asking for a retune.
+#[derive(Deserialize)]
+struct GuitarTuning {
+    name: String,
+    strings: Vec<i32>,
+}
+
 /// The player's guitar settings, kept by the app and sent at start and on every change.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -473,6 +481,7 @@ async fn load_song(
     start_level: u32,
     levels: HashMap<String, u32>,
     dynamic: Option<bool>,
+    guitar: Option<GuitarTuning>,
 ) -> Result<serde_json::Value, String> {
     let path = resolve(&app.library, &id)?;
     app.session.send(Command::StartLevel(start_level));
@@ -480,7 +489,9 @@ async fn load_song(
     let sample_rate = app.sample_rate;
     let (json, chart, track) = tauri::async_runtime::spawn_blocking(move || -> Result<_, String> {
         let text = fs::read_to_string(&path).map_err(|e| format!("{} : {e}", path.display()))?;
-        let chart = Chart::from_json(&text).map_err(|e| e.to_string())?;
+        let mut chart = Chart::from_json(&text).map_err(|e| e.to_string())?;
+        // Played on the guitar as it is tuned: the chart takes its tuning, the audio follows.
+        let shift = guitar.as_ref().and_then(|g| chart.retune_to(&g.strings, &g.name));
         let track = match (&chart.audio.backing, &chart.audio.guitar) {
             (Some(name), Some(guitar)) if path.with_file_name(guitar).is_file() => Some(
                 load_track_with_stem(&path.with_file_name(name), &path.with_file_name(guitar), sample_rate)
@@ -489,7 +500,16 @@ async fn load_song(
             (Some(name), _) => Some(load_track(&path.with_file_name(name), sample_rate).map_err(|e| e.to_string())?),
             (None, _) => None,
         };
-        let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        let track = match (track, shift) {
+            (Some(t), Some(s)) => Some(t.transposed(s, sample_rate as f64)),
+            (t, _) => t,
+        };
+        let mut json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        if let Some(s) = shift {
+            json["arrangement"]["tuning"] = serde_json::to_value(&chart.arrangement.tuning).map_err(|e| e.to_string())?;
+            json["transposed"] = s.into();
+            eprintln!("morceau transposé de {s:+.2} demi-tons pour la guitare en {}", chart.arrangement.tuning.name);
+        }
         Ok((json, chart, track))
     })
     .await

@@ -29,7 +29,7 @@ import { AttackHud, attackLevel, AttackRun, attackStartLevel, attackSummary, STR
 import { accelerated, countNotes, percent, riffLoop, RiffPanel, roundSpeed, type PhraseState, type RiffChoice } from './riff';
 import type { RiffLoop } from './engine/types';
 import { phraseLabels } from './sections';
-import { Tuner } from './tuner';
+import { Tuner, TUNINGS } from './tuner';
 import { AMP_MODELS, AmpPanel, DEFAULT_AMP, preset, sanitizeAmp, type AmpModelName, type AmpSettings } from './amp';
 import { Welcome, welcomed, type WelcomePart } from './welcome';
 import {
@@ -93,6 +93,8 @@ interface Settings extends GuitarValues {
   masterMode: boolean;
   /** Takes of what the guitar plays during songs, to tune the detection. */
   recordTakes: boolean;
+  /** The tuning the guitar stays in, songs transposed to it ('': retuned for each song). */
+  guitarTuning: string;
   /** The place behind the highway outside the career (whose gigs bring their own). */
   scenery: SceneryId;
   /** The guitar's sound, in free play and in songs. */
@@ -110,6 +112,7 @@ const DEFAULTS: Settings = {
   riffAccelerate: true,
   masterMode: true,
   recordTakes: false,
+  guitarTuning: '',
   scenery: 'concert',
   amp: DEFAULT_AMP,
   autopilot: false,
@@ -172,6 +175,10 @@ let audio: AudioStatus | null = null;
 let backlog: GameEvent[] = [];
 const form = $<HTMLFormElement>('settings');
 (form.elements.namedItem('scenery') as HTMLSelectElement).replaceChildren(...SCENERIES.map((s) => new Option(s.label, s.id)));
+(form.elements.namedItem('guitarTuning') as HTMLSelectElement).replaceChildren(
+  new Option(t('Celui de chaque morceau (je réaccorde)'), ''),
+  ...TUNINGS.map((x) => new Option(x.name, x.name)),
+);
 // The interface language: kept apart from the game settings, a change reloads the page in it.
 const langSelect = form.elements.namedItem('lang') as HTMLSelectElement;
 langSelect.replaceChildren(...LANGS.map((l) => new Option(l.label, l.id)));
@@ -971,6 +978,7 @@ async function start(id: string, riffOpening = false): Promise<void> {
   // The loading card only for a load long enough to be seen (a big backing track).
   const song = current;
   const shown = window.setTimeout(() => showLoading(song), 150);
+  if (engine instanceof TauriEngine) engine.guitar = TUNINGS.find((x) => x.name === settings.guitarTuning) ?? null;
   try {
     chart = await engine.load(id, progress[id]?.levels);
   } catch (e) {
@@ -981,6 +989,15 @@ async function start(id: string, riffOpening = false): Promise<void> {
     $('loading').hidden = true;
   }
   library.status('');
+  if (engine instanceof TauriEngine && engine.transposed) {
+    const n = engine.transposed;
+    const shift = `${n > 0 ? '+' : '−'}${(Math.round(Math.abs(n) * 10) / 10).toLocaleString(NUMBERS)}`;
+    hud.toast({
+      kind: 'phrase',
+      title: t('Joué en {tuning}', { tuning: chart.arrangement.tuning.name }),
+      detail: tn(Math.abs(n), 'Morceau décalé de {shift} demi-ton', 'Morceau décalé de {shift} demi-tons', { shift }),
+    });
+  }
   heldTuning = chart.arrangement.tuning.strings;
   view = new GameView(chart);
   highway.setChart(chart);
@@ -1604,6 +1621,7 @@ function syncSettings(): void {
   field<HTMLInputElement>('masterMode').checked = settings.masterMode;
   field<HTMLInputElement>('recordTakes').checked = settings.recordTakes;
   field<HTMLSelectElement>('scenery').value = settings.scenery;
+  field<HTMLSelectElement>('guitarTuning').value = settings.guitarTuning;
   if (!gig) highway.setScenery(settings.scenery);
   field<HTMLSelectElement>('speed').value = String(settings.speed);
   field<HTMLInputElement>('skill').value = String(settings.skill);
@@ -1621,6 +1639,7 @@ form.addEventListener('input', (e) => {
     settings.recordTakes = !settings.recordTakes;
     if (engine instanceof TauriEngine) engine.setRecording(settings.recordTakes);
   }
+  settings.guitarTuning = field<HTMLSelectElement>('guitarTuning').value;
   const scenery = field<HTMLSelectElement>('scenery').value;
   if (isScenery(scenery)) settings.scenery = scenery;
   settings.speed = Number(field<HTMLSelectElement>('speed').value);

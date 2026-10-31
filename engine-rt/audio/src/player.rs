@@ -11,6 +11,8 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::sync::atomic::{fence, AtomicU32, AtomicU64};
 use std::sync::Arc;
 
+use opensmith_dsp::fx::resample::resample_fast;
+
 /// A backing track: interleaved stereo at the engine sample rate. It may carry the song's own
 /// guitar as a separate stem, mixed in at a gain that can change while it plays.
 pub struct Track {
@@ -52,6 +54,42 @@ impl Track {
     /// Linear gain of the guitar stem; takes effect at once, even while playing.
     pub fn set_stem_gain(&self, gain: f32) {
         self.stem_gain.store(gain.max(0.0).to_bits(), Relaxed);
+    }
+
+    /// The track transposed by `semitones` (fractional too), its tempo and length unchanged:
+    /// stretched in time without changing pitch (as the Loop Trainer slows down), then resampled
+    /// back to its length, which moves the pitch. The stem follows, at the same gain. Offline:
+    /// about a second for a song.
+    pub fn transposed(&self, semitones: f64, sample_rate: f64) -> Track {
+        let p = 2f64.powf(semitones / 12.0);
+        let shift = |samples: &[f32]| -> Vec<f32> {
+            if (p - 1.0).abs() < 1e-6 {
+                return samples.to_vec();
+            }
+            let src = Track { samples: samples.to_vec(), stem: None, stem_gain: AtomicU32::new(0) };
+            let rate = 1.0 / p;
+            let mut stretch = Stretch::new(sample_rate);
+            let n = (src.frames() as f64 / rate).ceil() as usize;
+            let (mut left, mut right) = (Vec::with_capacity(n), Vec::with_capacity(n));
+            for k in 0..n {
+                let (l, r) = stretch.next(&src, k as f64 * rate, rate);
+                left.push(l);
+                right.push(r);
+            }
+            // Played at `p` times the rate, the stretched audio is back to the track's length.
+            let (from, to) = ((sample_rate * p) as f32, sample_rate as f32);
+            let (left, right) = std::thread::scope(|scope| {
+                let l = scope.spawn(|| resample_fast(&left, from, to, 16));
+                let r = resample_fast(&right, from, to, 16);
+                (l.join().unwrap_or_default(), r)
+            });
+            (0..src.frames()).flat_map(|i| [left.get(i).copied().unwrap_or(0.0), right.get(i).copied().unwrap_or(0.0)]).collect()
+        };
+        Track {
+            samples: shift(&self.samples),
+            stem: self.stem.as_deref().map(shift),
+            stem_gain: AtomicU32::new(self.stem_gain.load(Relaxed)),
+        }
     }
 
     pub fn frames(&self) -> usize {
