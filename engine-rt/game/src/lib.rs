@@ -2,13 +2,14 @@
 //! against it, keeps score and streak, and adapts each phrase's difficulty to the player.
 //!
 //! It knows nothing about audio: the engine feeds it note attacks from the tracker
-//! (`on_note`) and chord-verifier results (`on_chord`), and moves its clock (`advance`).
+//! (`on_note`, `on_strum`) and chord-verifier results (`on_chord`), and moves its clock
+//! (`advance`).
 
 pub mod chart;
 pub mod game;
 
 pub use chart::{Chart, ChartError};
-pub use game::{Expected, Game, GameConfig, Judgement, Score, Status, Target};
+pub use game::{Expected, Game, GameConfig, Judgement, MissReason, Score, Status, Target};
 
 #[cfg(test)]
 mod tests {

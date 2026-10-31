@@ -19,6 +19,16 @@ export interface Expected {
 
 export type Status = 'pending' | 'hit' | 'missed';
 
+/** Why a note was missed (engine-rt/game MissReason). */
+export type MissReason =
+  | { kind: 'unplayed' }
+  /** The right note (a strum, for a chord) `error` seconds from its time, negative when early. */
+  | { kind: 'timing'; error: number }
+  /** Another note, `semitones` away: positive when too high. */
+  | { kind: 'pitch'; semitones: number }
+  /** Strummed in time, not heard as the chord. */
+  | { kind: 'wrongChord' };
+
 export interface Score {
   hits: number;
   perfects: number;
@@ -35,7 +45,9 @@ export type GameEvent =
   /** A phrase iteration became visible at `level`. */
   | { type: 'expected'; iteration: number; level: number; items: Expected[] }
   | { type: 'hit'; index: number; time: number; error: number; perfect: boolean }
-  | { type: 'miss'; index: number; time: number }
+  | { type: 'miss'; index: number; time: number; reason: MissReason }
+  /** A missed note played after all, `error` seconds late. */
+  | { type: 'late'; index: number; error: number }
   | { type: 'phrase'; iteration: number; name: string; accuracy: number; level: number; nextLevel: number }
   | { type: 'score'; score: Score }
   /** Loop Trainer: a pass over the loop is over, with its own score. */

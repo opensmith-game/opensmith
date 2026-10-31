@@ -16,7 +16,7 @@ use import::{Importer, Job, JobState, Origin, Pipeline, Queue, ORIGIN};
 use opensmith_audio::{list_devices, Engine, EngineConfig, InputKind};
 use opensmith_dsp::{AmpKnobs, AmpModel, ChainParams};
 use opensmith_game::Chart;
-use opensmith_session::{load_track, Command, Devices, EngineBackend, RiffLoop, SessionConfig, SessionHandle, UiEvent};
+use opensmith_session::{load_track, load_track_with_stem, Command, Devices, EngineBackend, RiffLoop, SessionConfig, SessionHandle, UiEvent};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 
@@ -92,6 +92,9 @@ struct InputSettings {
     /// Linear gains.
     backing_volume: f32,
     monitor_volume: f32,
+    /// The song's own guitar, when the import kept it as a stem (MP3 imports, feedpak).
+    #[serde(default)]
+    stem_volume: f32,
 }
 
 #[derive(Serialize)]
@@ -448,9 +451,13 @@ async fn load_song(
     let (json, chart, track) = tauri::async_runtime::spawn_blocking(move || -> Result<_, String> {
         let text = fs::read_to_string(&path).map_err(|e| format!("{} : {e}", path.display()))?;
         let chart = Chart::from_json(&text).map_err(|e| e.to_string())?;
-        let track = match &chart.audio.backing {
-            Some(name) => Some(load_track(&path.with_file_name(name), sample_rate).map_err(|e| e.to_string())?),
-            None => None,
+        let track = match (&chart.audio.backing, &chart.audio.guitar) {
+            (Some(name), Some(guitar)) if path.with_file_name(guitar).is_file() => Some(
+                load_track_with_stem(&path.with_file_name(name), &path.with_file_name(guitar), sample_rate)
+                    .map_err(|e| e.to_string())?,
+            ),
+            (Some(name), _) => Some(load_track(&path.with_file_name(name), sample_rate).map_err(|e| e.to_string())?),
+            (None, _) => None,
         };
         let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
         Ok((json, chart, track))
@@ -561,6 +568,7 @@ fn configure_input(app: State<'_, App>, settings: InputSettings) {
     app.session.send(Command::InputOffset(settings.input_offset_ms / 1000.0));
     app.session.send(Command::Volume(settings.backing_volume));
     app.session.send(Command::MonitorGain(settings.monitor_volume));
+    app.session.send(Command::StemVolume(settings.stem_volume));
 }
 
 /// The amp as the player set it: a model and its knobs (0..1), sent at start and on every change.

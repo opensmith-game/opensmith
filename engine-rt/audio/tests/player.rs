@@ -354,3 +354,22 @@ fn the_amp_changes_while_playing() {
     let after = duplex(&mut b, 200, 200);
     assert!(after > 0.0 && after < before / 4.0, "{after} vs {before}");
 }
+
+#[test]
+fn the_songs_own_guitar_comes_in_at_its_gain_while_playing() {
+    let mut b = bridge();
+    let backing = vec![0.1f32; 2 * 4_000];
+    let guitar = vec![0.5f32; 3_000]; // mono, shorter: doubled, then padded with silence
+    let track = Arc::new(Track::from_interleaved(&backing, 2).with_stem(&guitar, 1));
+    assert!(track.has_stem());
+    b.monitor.send(PlayerCommand::Load { track: Some(track.clone()), frame: 0, generation: 1 });
+    b.monitor.send(PlayerCommand::Play);
+    let silent = run(&mut b, 0, 10);
+    assert!(silent.iter().all(|&v| (v - 0.1).abs() < 1e-6), "the stem starts silent");
+    track.set_stem_gain(0.4);
+    let mixed = run(&mut b, 10, 10);
+    assert!(mixed.iter().all(|&v| (v - 0.3).abs() < 1e-6), "0.1 + 0.4 × 0.5");
+    run(&mut b, 20, 28); // to frame 3072
+    let past = run(&mut b, 48, 10);
+    assert!(past.iter().all(|&v| (v - 0.1).abs() < 1e-6), "past the stem's end: the backing alone");
+}

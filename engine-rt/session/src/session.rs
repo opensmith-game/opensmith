@@ -103,6 +103,8 @@ struct Applied {
     input_gain: Option<f32>,
     monitor_gain: Option<f32>,
     volume: Option<f32>,
+    /// Gain of the song's own guitar stem, for every track loaded.
+    stem: f32,
     chain: Option<ChainParams>,
 }
 
@@ -199,6 +201,9 @@ impl<B: AudioBackend> Session<B> {
     /// Loads a song and its backing track, stopped at song time `start` (negative: count-in).
     pub fn load(&mut self, chart: Chart, track: Option<Track>, start: f64) {
         let track = track.map(Arc::new);
+        if let Some(t) = &track {
+            t.set_stem_gain(self.applied.stem);
+        }
         self.tracks.extend(track.clone());
         self.has_track = track.is_some();
         self.offset = chart.audio.offset;
@@ -377,6 +382,15 @@ impl<B: AudioBackend> Session<B> {
         self.backend.monitor().send(PlayerCommand::Gain(gain));
     }
 
+    /// Linear gain of the song's own guitar, when its track has it as a stem (silent by
+    /// default): heard at once, and kept for the next songs.
+    pub fn set_stem_volume(&mut self, gain: f32) {
+        self.applied.stem = gain;
+        for t in &self.tracks {
+            t.set_stem_gain(gain);
+        }
+    }
+
     /// Song time heard now (s).
     pub fn time(&mut self) -> f64 {
         let now = self.backend.now_ns() as f64;
@@ -456,6 +470,11 @@ impl<B: AudioBackend> Session<B> {
         flush_expected(game, &mut self.sent, &mut self.events);
         if self.autopilot && clock.playing {
             self.events.extend(game.autoplay(now).into_iter().map(UiEvent::from));
+        }
+        if clock.playing {
+            for &t in &strums {
+                self.events.extend(game.on_strum(t).map(UiEvent::from));
+            }
         }
         for (time, midi, cents) in heard {
             self.events.push(UiEvent::Heard { time, midi, cents });

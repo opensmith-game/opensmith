@@ -1,4 +1,4 @@
-use opensmith_game::{Expected, Judgement, Score, Target};
+use opensmith_game::{Expected, Judgement, MissReason, Score, Target};
 use serde::Serialize;
 
 /// What the UI is told, serialised for the TypeScript side (app/src/game/types.ts).
@@ -10,7 +10,9 @@ pub enum UiEvent {
     /// A phrase iteration became visible at `level`.
     Expected { iteration: usize, level: u32, items: Vec<UiExpected> },
     Hit { index: usize, time: f64, error: f64, perfect: bool },
-    Miss { index: usize, time: f64 },
+    Miss { index: usize, time: f64, reason: UiMissReason },
+    /// A missed note played after all, `error` seconds late.
+    Late { index: usize, error: f64 },
     #[serde(rename_all = "camelCase")]
     Phrase { iteration: usize, name: String, accuracy: f64, level: u32, next_level: u32 },
     Score { score: UiScore },
@@ -55,6 +57,29 @@ pub enum UiTarget {
     Chord { template: usize, midis: Vec<i32> },
 }
 
+/// Why a note was missed (opensmith_game::MissReason).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum UiMissReason {
+    Unplayed,
+    /// `error` seconds from the note's time, negative when early.
+    Timing { error: f64 },
+    /// Positive when too high.
+    Pitch { semitones: i32 },
+    WrongChord,
+}
+
+impl From<MissReason> for UiMissReason {
+    fn from(r: MissReason) -> Self {
+        match r {
+            MissReason::Unplayed => UiMissReason::Unplayed,
+            MissReason::Timing { error } => UiMissReason::Timing { error },
+            MissReason::Pitch { semitones } => UiMissReason::Pitch { semitones },
+            MissReason::WrongChord => UiMissReason::WrongChord,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiScore {
@@ -95,7 +120,8 @@ impl From<Judgement> for UiEvent {
     fn from(j: Judgement) -> UiEvent {
         match j {
             Judgement::Hit { index, time, error, perfect } => UiEvent::Hit { index, time, error, perfect },
-            Judgement::Miss { index, time } => UiEvent::Miss { index, time },
+            Judgement::Miss { index, time, reason } => UiEvent::Miss { index, time, reason: reason.into() },
+            Judgement::Late { index, error } => UiEvent::Late { index, error },
             Judgement::PhraseDone { iteration, name, accuracy, level, next_level } => {
                 UiEvent::Phrase { iteration, name, accuracy, level, next_level }
             }
@@ -131,5 +157,12 @@ mod tests {
         let s = UiEvent::Score { score: UiScore { best_streak: 4, ..UiScore::default() } };
         assert!(serde_json::to_string(&s).unwrap().contains(r#""bestStreak":4"#));
         assert_eq!(serde_json::to_string(&UiEvent::Reset).unwrap(), r#"{"type":"reset"}"#);
+        let m = UiEvent::Miss { index: 4, time: 2.0, reason: UiMissReason::Pitch { semitones: -1 } };
+        assert_eq!(
+            serde_json::to_string(&m).unwrap(),
+            r#"{"type":"miss","index":4,"time":2.0,"reason":{"kind":"pitch","semitones":-1}}"#
+        );
+        let m = UiEvent::Miss { index: 4, time: 2.0, reason: UiMissReason::WrongChord };
+        assert!(serde_json::to_string(&m).unwrap().contains(r#""reason":{"kind":"wrongChord"}"#));
     }
 }

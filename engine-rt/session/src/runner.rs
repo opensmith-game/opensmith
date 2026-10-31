@@ -42,6 +42,8 @@ pub enum Command {
     Pause,
     Seek(f64),
     Volume(f32),
+    /// Linear gain of the song's own guitar (a stem of the track).
+    StemVolume(f32),
     /// Difficulty level every phrase starts at, from the next load.
     StartLevel(u32),
     /// Dynamic difficulty on or off (Score Attack: a fixed level), from the next load.
@@ -207,6 +209,7 @@ where
                 Ok(Command::Pause) => session.pause(),
                 Ok(Command::Seek(t)) => session.seek(t),
                 Ok(Command::Volume(g)) => session.set_volume(g),
+                Ok(Command::StemVolume(g)) => session.set_stem_volume(g),
                 Ok(Command::StartLevel(l)) => session.set_start_level(l),
                 Ok(Command::Dynamic(on)) => session.set_dynamic(on),
                 Ok(Command::Difficulty { dynamic, level }) => session.set_difficulty(dynamic, level),

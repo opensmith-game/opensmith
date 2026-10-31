@@ -9,10 +9,18 @@ _Dernière mise à jour : 2026-10-31 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, P
 | 3 | App Tauri v2 + Note Highway Three.js + boucle de jeu branchée sur le moteur | ✅ terminée |
 | 4 | L'envie de rejouer : progression sauvegardée, Loop Trainer (boucle + ralenti sans changer la hauteur), mode Maître | ✅ terminée |
 | 5 | Préparation open source : formats en plugins, app autonome sur un autre Mac, anglais, CI, morceau de démo, licence GPL-3.0 | ✅ terminée |
+| 6 | Mesurer la transcription (banc d'essai) ; dire pourquoi une note est ratée, la latence restante, la guitare du morceau | 🚧 en cours |
 
-**Tests : 381 verts** — Rust 115 (moteur 101, app 14) + 3 lancés à la demande (vrai matériel, vrai pipeline) ; interface 134 (Vitest) ; Python 132 rapides + 8 de bout en bout.
+**Tests : 405 verts** — Rust 125 (moteur 111, app 14) + 3 lancés à la demande (vrai matériel, vrai pipeline) ; interface 139 (Vitest) ; Python 141 rapides + 8 de bout en bout.
 
 ---
+
+## Étape 6 — Mesurer, et mieux expliquer au joueur
+
+- **Banc d'essai de la transcription** : `opensmith-ingest bench` passe des morceaux dont on a la tablature écrite à la main dans la chaîne MP3 et compte les notes retrouvées (à 50 ms près, à chaque étape : brut, nettoyé, tablature), `--ablation` retire une à une les étapes du nettoyage ; `opensmith-ingest bench-view` affiche les runs dans le navigateur (couverture, tableau en clair, historique). Ce qu'il a déjà corrigé : la fusion des fragments ne fusionne plus deux attaques (elle coûtait 7 points), le vote des répétitions ne plante plus quand aucune octave ne fait le tiers.
+- **Pourquoi une note est ratée** : le moteur dit, pour chaque note ou accord raté, ce que la guitare a joué autour : rien, la bonne note trop tôt ou trop tard (jusqu'à 350 ms), une autre note (trop haute, trop basse), ou un accord qui n'était pas le bon. Une note jouée si tard qu'elle arrive après la sanction l'explique à ce moment-là. L'autoroute l'écrit au-dessus des cordes (« Trop tôt », « Trop tard », « Trop haut », « Trop bas », « Mauvais accord ») ; l'écran de fin fait le compte.
+- **Latence restante** : à la fin d'un morceau, si les notes arrivent toutes en retard (ou en avance) d'à peu près autant (au moins 20 notes, médiane ≥ 15 ms, écart interquartile ≤ 70 ms), l'écran de fin le dit et propose de compenser d'un clic.
+- **Guitare du morceau** : quand l'import a gardé la guitare à part (imports MP3, feedpak), elle voyage avec l'accompagnement et se règle à chaud dans le menu pause (« Guitare du morceau », muette par défaut) ; le lecteur temps réel la mixe sans commande ni allocation de plus.
 
 ## Étape 5 — Préparer la publication open source
 

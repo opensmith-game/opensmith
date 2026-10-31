@@ -60,15 +60,12 @@ describe('guitar settings', () => {
     expect(suggestGainDb(3, 0.0001, 0.00012)).toMatchObject({ ok: false, gainDb: 3 });
   });
 
-  it('sends perceptual volumes as gains, the master on both', () => {
-    expect(engineSettings({ inputGainDb: 2, inputOffsetMs: 25, visualOffsetMs: 0, masterVolume: 1, backingVolume: 0.5, monitorVolume: 1 })).toEqual({
-      inputGainDb: 2,
-      inputOffsetMs: 25,
-      backingVolume: 0.25,
-      monitorVolume: 1,
-    });
-    const half = engineSettings({ inputGainDb: 0, inputOffsetMs: 0, visualOffsetMs: 0, masterVolume: 0.5, backingVolume: 1, monitorVolume: 0.8 });
+  it('sends perceptual volumes as gains, the master on all', () => {
+    const v = { inputGainDb: 2, inputOffsetMs: 25, visualOffsetMs: 0, masterVolume: 1, backingVolume: 0.5, monitorVolume: 1, stemVolume: 0 };
+    expect(engineSettings(v)).toEqual({ inputGainDb: 2, inputOffsetMs: 25, backingVolume: 0.25, monitorVolume: 1, stemVolume: 0 });
+    const half = engineSettings({ ...v, inputGainDb: 0, inputOffsetMs: 0, masterVolume: 0.5, backingVolume: 1, monitorVolume: 0.8, stemVolume: 0.6 });
     expect(half.backingVolume).toBeCloseTo(0.25);
     expect(half.monitorVolume).toBeCloseTo(0.16);
+    expect(half.stemVolume).toBeCloseTo(0.09);
   });
 });

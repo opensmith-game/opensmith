@@ -17,6 +17,7 @@ import { isTauri, TauriEngine, type AudioStatus } from './engine/tauri';
 import type { Engine, SongEntry } from './engine/types';
 import { DEFAULT_GUITAR, engineSettings, GuitarSettings, type GuitarValues } from './guitar-settings';
 import { accuracy, type GameEvent } from './game/types';
+import { missCounts, steadyOffset } from './game/timing';
 import { GameView, type Pass, type PhraseDone } from './game/view';
 import { Highway } from './highway/highway';
 import { isScenery, SCENERIES, type SceneryId } from './highway/scenery';
@@ -371,7 +372,7 @@ function showPause(): void {
 }
 
 function renderQuick(): void {
-  for (const name of ['backingVolume', 'monitorVolume'] as const) {
+  for (const name of ['backingVolume', 'monitorVolume', 'stemVolume'] as const) {
     (quick.elements.namedItem(name) as HTMLInputElement).value = String(settings[name]);
     quick.querySelector(`[data-out="${name}"]`)!.textContent = `${Math.round(settings[name] * 100)} %`;
   }
@@ -379,6 +380,8 @@ function renderQuick(): void {
   const monitor = quick.elements.namedItem('monitorVolume') as HTMLInputElement;
   monitor.disabled = !audio?.monitor;
   monitor.closest('.row')!.classList.toggle('disabled', monitor.disabled);
+  // Only songs imported with their guitar kept apart have one to bring back.
+  $('stemRow').hidden = !chart?.audio.guitar;
   $('quickAmp').querySelectorAll<HTMLElement>('button').forEach((b) => b.classList.toggle('on', b.dataset.model === settings.amp.model));
   $('quickSpeed').querySelectorAll<HTMLElement>('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.speed) === settings.speed));
   // Score Attack keeps the difficulty it was started at.
@@ -418,7 +421,7 @@ $('quickSpeed').replaceChildren(...SPEEDS.map((s) => segment(s.label, { speed: S
 
 quick.addEventListener('input', (e) => {
   const input = e.target as HTMLInputElement;
-  if (input.name !== 'backingVolume' && input.name !== 'monitorVolume') return;
+  if (input.name !== 'backingVolume' && input.name !== 'monitorVolume' && input.name !== 'stemVolume') return;
   settings[input.name] = Number(input.value);
   syncSettings();
   applyVolumes();
@@ -1439,6 +1442,48 @@ function settleRun(ch: Challenge, run: { failed: boolean; accuracy: number }): v
   $('records').before(line);
 }
 
+/** On the results: why the notes were missed, and a steady lag offered as latency to compensate. */
+function showTiming(v: GameView): void {
+  for (const old of document.querySelectorAll('#results .timing-result')) old.remove();
+  const line = (text: string) => {
+    const p = document.createElement('p');
+    p.className = 'challenge-result timing-result';
+    p.textContent = text;
+    $('records').before(p);
+    return p;
+  };
+  const n = missCounts(v.items.filter((i) => i?.status === 'missed').map((i) => i.reason));
+  const parts = [
+    n.late && t('{n} trop tard', { n: n.late }),
+    n.early && t('{n} trop tôt', { n: n.early }),
+    n.high && tn(n.high, '{n} trop haute', '{n} trop hautes'),
+    n.low && tn(n.low, '{n} trop basse', '{n} trop basses'),
+    n.chord && tn(n.chord, '{n} mauvais accord', '{n} mauvais accords'),
+    n.unplayed && tn(n.unplayed, '{n} pas jouée', '{n} pas jouées'),
+  ].filter(Boolean);
+  if (parts.length) line(t('Notes ratées : {list}', { list: parts.join(' · ') }));
+  const steady = engine instanceof TauriEngine ? steadyOffset(v.timing) : null;
+  if (!steady) return;
+  const ms = Math.abs(steady.medianMs);
+  const p = line(
+    steady.medianMs > 0
+      ? t('Tes notes arrivent en moyenne {ms} ms en retard, toujours à peu près pareil : c’est sans doute la latence.', { ms })
+      : t('Tes notes arrivent en moyenne {ms} ms en avance, toujours à peu près pareil : c’est sans doute la latence.', { ms }),
+  );
+  const fix = document.createElement('button');
+  fix.type = 'button';
+  fix.className = 'action small';
+  const target = Math.max(-150, Math.min(150, settings.inputOffsetMs + steady.medianMs));
+  fix.textContent = t('Compenser ({offset} ms)', { offset: `${steady.medianMs > 0 ? '+' : '−'}${ms}` });
+  fix.addEventListener('click', () => {
+    settings.inputOffsetMs = target;
+    syncSettings();
+    applyVolumes();
+    fix.replaceWith(t('Compensation réglée à {offset} ms.', { offset: target }));
+  });
+  p.append(' ', fix);
+}
+
 function showResults(): void {
   if (!view || !chart) return;
   engine.pause();
@@ -1490,6 +1535,7 @@ function showResults(): void {
   $('records').textContent = records;
   $('records').classList.toggle('new', records.includes('!'));
   showAttackResults(grade);
+  showTiming(view);
   // One bar per phrase: height = level played, colour = how well.
   const levels = chart.arrangement.maxDifficulty + 1;
   const labels = phraseLabels(chart);
@@ -1701,7 +1747,7 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-const GAME_EVENTS = new Set(['reset', 'expected', 'hit', 'miss', 'phrase', 'score', 'pass', 'end']);
+const GAME_EVENTS = new Set(['reset', 'expected', 'hit', 'miss', 'late', 'phrase', 'score', 'pass', 'end']);
 
 let last = performance.now();
 function frame(ms: number): void {

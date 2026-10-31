@@ -35,6 +35,8 @@ export interface InputSettings {
   /** Linear gains. */
   backingVolume: number;
   monitorVolume: number;
+  /** The song's own guitar, when its import kept it as a stem. */
+  stemVolume: number;
 }
 
 export interface AudioStatus {

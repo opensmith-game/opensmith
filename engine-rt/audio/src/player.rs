@@ -8,24 +8,50 @@
 //! the input device gets its place in the song.
 
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use std::sync::atomic::{fence, AtomicU64};
+use std::sync::atomic::{fence, AtomicU32, AtomicU64};
 use std::sync::Arc;
 
-/// A backing track: interleaved stereo at the engine sample rate.
+/// A backing track: interleaved stereo at the engine sample rate. It may carry the song's own
+/// guitar as a separate stem, mixed in at a gain that can change while it plays.
 pub struct Track {
     samples: Vec<f32>,
+    stem: Option<Vec<f32>>,
+    /// Linear gain of the stem (f32 bits).
+    stem_gain: AtomicU32,
+}
+
+/// `data` interleaved with `channels` channels as stereo: mono is doubled, channels past two
+/// dropped.
+fn stereo(data: &[f32], channels: usize) -> Vec<f32> {
+    match channels.max(1) {
+        1 => data.iter().flat_map(|&v| [v, v]).collect(),
+        2 => data.to_vec(),
+        n => data.chunks_exact(n).flat_map(|f| [f[0], f[1]]).collect(),
+    }
 }
 
 impl Track {
     /// `data` interleaved with `channels` channels: mono is doubled, channels past two dropped.
     pub fn from_interleaved(data: &[f32], channels: usize) -> Track {
-        let channels = channels.max(1);
-        let samples = match channels {
-            1 => data.iter().flat_map(|&v| [v, v]).collect(),
-            2 => data.to_vec(),
-            n => data.chunks_exact(n).flat_map(|f| [f[0], f[1]]).collect(),
-        };
-        Track { samples }
+        Track { samples: stereo(data, channels), stem: None, stem_gain: AtomicU32::new(0) }
+    }
+
+    /// Adds the song's guitar (interleaved, `channels` channels, same sample rate), silent until
+    /// [`Track::set_stem_gain`]. The track keeps its length: the stem is cut or padded to it.
+    pub fn with_stem(mut self, data: &[f32], channels: usize) -> Track {
+        let mut stem = stereo(data, channels);
+        stem.resize(self.samples.len(), 0.0);
+        self.stem = Some(stem);
+        self
+    }
+
+    pub fn has_stem(&self) -> bool {
+        self.stem.is_some()
+    }
+
+    /// Linear gain of the guitar stem; takes effect at once, even while playing.
+    pub fn set_stem_gain(&self, gain: f32) {
+        self.stem_gain.store(gain.max(0.0).to_bits(), Relaxed);
     }
 
     pub fn frames(&self) -> usize {
@@ -43,7 +69,13 @@ impl Track {
             return (0.0, 0.0);
         }
         let k = 2 * i as usize;
-        (self.samples[k], self.samples[k + 1])
+        match &self.stem {
+            Some(stem) => {
+                let g = f32::from_bits(self.stem_gain.load(Relaxed));
+                (self.samples[k] + g * stem[k], self.samples[k + 1] + g * stem[k + 1])
+            }
+            None => (self.samples[k], self.samples[k + 1]),
+        }
     }
 
     #[inline]

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { levelNotes, parseChart, startLevelFor } from '../src/chart';
 import { DEFAULT_LOCAL, LocalGame, type LocalGameConfig } from '../src/game/local';
 import { accuracy, type GameEvent, type Score } from '../src/game/types';
-import { GameView } from '../src/game/view';
+import { GameView, missText } from '../src/game/view';
 
 /** Same chart as the Rust closed-loop test (engine-rt/game/tests/game_loop.rs): phrases rest A B A B rest. */
 const chart = parseChart(
@@ -78,6 +78,35 @@ describe('demo game', () => {
     const t = 12;
     const first = view.firstVisible(t);
     expect(view.items.slice(0, first).every((i) => i.time + i.sustain < t)).toBe(true);
+  });
+});
+
+describe('why a note was missed', () => {
+  it('every miss says why, and a late note explains its miss afterwards', () => {
+    const events = play({ skill: 0.5 });
+    const misses = of(events, 'miss');
+    expect(misses.length).toBeGreaterThan(5);
+    expect(new Set(misses.map((m) => m.reason.kind)).size).toBeGreaterThan(2);
+
+    const view = new GameView(chart);
+    view.apply(events, 0);
+    const missed = view.items.filter((i) => i.status === 'missed');
+    expect(missed.every((i) => i.reason)).toBe(true);
+    const first = missed[0];
+    view.drainEffects();
+    view.apply([{ type: 'late', index: first.index, error: 0.2 }], 0);
+    expect(first.reason).toEqual({ kind: 'timing', error: 0.2 });
+    expect(view.drainEffects().map((e) => e.kind)).toEqual(['late']);
+  });
+
+  it('says it in words, except when nothing was played', () => {
+    expect(missText({ kind: 'timing', error: -0.2 })).toBe('Trop tôt');
+    expect(missText({ kind: 'timing', error: 0.2 })).toBe('Trop tard');
+    expect(missText({ kind: 'pitch', semitones: 2 })).toBe('Trop haut');
+    expect(missText({ kind: 'pitch', semitones: -1 })).toBe('Trop bas');
+    expect(missText({ kind: 'wrongChord' })).toBe('Mauvais accord');
+    expect(missText({ kind: 'unplayed' })).toBeNull();
+    expect(missText(undefined)).toBeNull();
   });
 });
 

@@ -1,16 +1,33 @@
 import type { Chart } from '../chart';
 import { t } from '../i18n';
-import { emptyScore, type Expected, type GameEvent, type Score, type Status } from './types';
+import { emptyScore, type Expected, type GameEvent, type MissReason, type Score, type Status } from './types';
 
 export interface ViewItem extends Expected {
   status: Status;
   error: number;
   perfect: boolean;
+  /** Missed: why. */
+  reason?: MissReason;
 }
 
 export interface Effect {
-  kind: 'hit' | 'miss';
+  /** `late`: a missed note played after all (its reason is now timing). */
+  kind: 'hit' | 'miss' | 'late';
   item: ViewItem;
+}
+
+/** What to tell the player about a miss; nothing when nothing was played. */
+export function missText(reason: MissReason | undefined): string | null {
+  switch (reason?.kind) {
+    case 'timing':
+      return reason.error < 0 ? t('Trop tôt') : t('Trop tard');
+    case 'pitch':
+      return reason.semitones > 0 ? t('Trop haut') : t('Trop bas');
+    case 'wrongChord':
+      return t('Mauvais accord');
+    default:
+      return null;
+  }
 }
 
 export interface Toast {
@@ -48,6 +65,8 @@ export class GameView {
   maxSustain = 0;
   ended = false;
   heard: { midi: number; cents: number; at: number } | null = null;
+  /** Timing errors judged since the last reset (s, positive when late): hits, and misses out of time. */
+  timing: number[] = [];
   /** Level of each phrase iteration made visible so far. */
   readonly levels = new Map<number, number>();
   readonly results = new Map<number, PhraseResult>();
@@ -66,6 +85,7 @@ export class GameView {
           this.score = emptyScore();
           this.maxSustain = 0;
           this.ended = false;
+          this.timing = [];
           this.levels.clear();
           this.results.clear();
           this.effects = [];
@@ -86,8 +106,20 @@ export class GameView {
           if (e.type === 'hit') {
             it.error = e.error;
             it.perfect = e.perfect;
+            this.timing.push(e.error);
+          } else {
+            it.reason = e.reason;
+            if (e.reason.kind === 'timing') this.timing.push(e.reason.error);
           }
           this.effects.push({ kind: e.type, item: it });
+          break;
+        }
+        case 'late': {
+          const it = this.items[e.index];
+          if (!it || it.status !== 'missed') break;
+          it.reason = { kind: 'timing', error: e.error };
+          this.timing.push(e.error);
+          this.effects.push({ kind: 'late', item: it });
           break;
         }
         case 'phrase':

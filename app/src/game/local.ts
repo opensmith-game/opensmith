@@ -1,5 +1,5 @@
 import { chordPitches, pitch, type Chart } from '../chart';
-import { emptyScore, multiplier, type Expected, type GameEvent, type Score } from './types';
+import { emptyScore, multiplier, type Expected, type GameEvent, type MissReason, type Score } from './types';
 
 export interface LocalGameConfig {
   hitWindow: number;
@@ -59,6 +59,8 @@ export class LocalGame {
   private cursor = 0;
   private score: Score = emptyScore();
   private rand: () => number;
+  /** The auto-player's excuses for its misses (its own draws: the hits do not change). */
+  private excuse: () => number;
 
   /**
    * @param startAt song time where playing starts: earlier notes are not judged.
@@ -75,6 +77,7 @@ export class LocalGame {
     for (const [name, level] of Object.entries(levels)) this.levels.set(name, Math.min(level, top));
     this.iterations = chart.phrases.map(() => ({ level: 0, total: 0, hits: 0, activated: false, done: false }));
     this.rand = mulberry32(cfg.seed);
+    this.excuse = mulberry32(cfg.seed + 1);
     while (this.next < chart.phrases.length && chart.phrases[this.next].end <= startAt) {
       this.iterations[this.next] = { level: 0, total: 0, hits: 0, activated: true, done: true };
       this.next++;
@@ -172,7 +175,17 @@ export class LocalGame {
     p.pending = false;
     this.score.misses++;
     this.score.streak = 0;
-    out.push({ type: 'miss', index: p.item.index, time: p.item.time });
+    out.push({ type: 'miss', index: p.item.index, time: p.item.time, reason: this.reason(p.item) });
+  }
+
+  /** Why the auto-player missed: as varied as a real one. */
+  private reason(item: Expected): MissReason {
+    const r = this.excuse();
+    const side = this.excuse() < 0.5 ? -1 : 1;
+    if (r < 0.3) return { kind: 'unplayed' };
+    if (r < 0.7) return { kind: 'timing', error: side * (0.12 + 0.15 * this.excuse()) };
+    if (item.target.kind === 'chord') return { kind: 'wrongChord' };
+    return { kind: 'pitch', semitones: side * (1 + Math.floor(2 * this.excuse())) };
   }
 
   private closePhrases(now: number, out: GameEvent[]): void {

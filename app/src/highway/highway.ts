@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { firstAtOrAfter, lastAtOrBefore, type Chart, type Techniques } from '../chart';
-import type { GameView, ViewItem } from '../game/view';
+import { missText, type GameView, type ViewItem } from '../game/view';
 import {
   Arrivals,
   FRETS,
@@ -89,6 +89,12 @@ const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
 const CHORD_NAME: TextStyle = { size: 80, color: '#ffffff', stroke: 'rgba(4,8,24,0.95)' };
 const TECHNIQUE: TextStyle = { size: 64, color: '#ffe7a0', stroke: 'rgba(0,0,0,0.9)' };
 const PHRASE_NAME: TextStyle = { size: 64, weight: 600, color: '#a9c1ff', stroke: 'rgba(0,0,0,0.85)' };
+/** Why a note was missed, by kind: timing in amber, pitch in blue, a wrong chord in red. */
+const MISS_TIMING: TextStyle = { size: 72, weight: 800, color: '#ffd166', stroke: 'rgba(0,0,0,0.9)' };
+const MISS_PITCH: TextStyle = { size: 72, weight: 800, color: '#8fd3ff', stroke: 'rgba(0,0,0,0.9)' };
+const MISS_CHORD: TextStyle = { size: 72, weight: 800, color: '#ff8a8a', stroke: 'rgba(0,0,0,0.9)' };
+/** How long a miss's reason stays above the strings, seconds. */
+const CALLOUT_LIFE = 1.1;
 
 interface AnchorSpan {
   start: number;
@@ -113,6 +119,14 @@ interface Point {
   x: number;
   y: number;
   string: number;
+}
+
+/** Why a note was missed, floating up above where it met the strings. */
+interface Callout {
+  text: string;
+  style: TextStyle;
+  x: number;
+  born: number;
 }
 
 type Layers = Record<'zones' | 'shapes' | 'beats' | 'edges' | 'marks' | 'tails' | 'stems' | 'frames' | 'gems' | 'bars' | 'guides', Layer>;
@@ -173,6 +187,7 @@ export class Highway {
   private readonly strings: StringLine[] = [];
   private readonly fretNumbers: THREE.Sprite[] = [];
   private readonly upcoming: number[] = [];
+  private callouts: Callout[] = [];
   private readonly nextFret = new Map<number, { string: number; ahead: number }>();
   private readonly cam = { x: 2.5, scale: 1 };
   /** Strings of the next note, 0..1 this frame (see `guide`). */
@@ -398,6 +413,7 @@ export class Highway {
         this.drawItems(now, view);
         this.applyEffects(view);
       }
+      this.drawCallouts();
     }
     for (const layer of layers) layer.end();
     this.labels.end();
@@ -771,6 +787,8 @@ export class Highway {
 
   private applyEffects(view: GameView): void {
     for (const e of view.drainEffects()) {
+      if (e.kind !== 'hit') this.callout(e.item);
+      if (e.kind === 'late') continue;
       for (const p of this.points(e.item)) {
         const line = this.strings[p.string];
         if (e.kind === 'miss') {
@@ -783,6 +801,30 @@ export class Highway {
         this.particles.burst(p.x, p.y, 0.1, c, e.item.perfect ? 28 : 16, 5.5, 0.09, 0.6);
         this.particles.flash(p.x, p.y, 0.15, c, e.item.perfect ? 1.2 : 0.8, 0.22);
       }
+    }
+  }
+
+  /** Says above the strings why `it` was missed (nothing when it was not played). */
+  private callout(it: ViewItem): void {
+    const text = missText(it.reason);
+    const points = this.points(it);
+    if (!text || !points.length) return;
+    const kind = it.reason?.kind;
+    const style = kind === 'timing' ? MISS_TIMING : kind === 'pitch' ? MISS_PITCH : MISS_CHORD;
+    const x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    // A late note replaces what its miss said.
+    this.callouts = this.callouts.filter((c) => Math.abs(c.x - x) > 0.01 || this.wall - c.born > 0.6);
+    this.callouts.push({ text, style, x, born: this.wall });
+  }
+
+  private drawCallouts(): void {
+    this.callouts = this.callouts.filter((c) => this.wall - c.born < CALLOUT_LIFE);
+    for (const c of this.callouts) {
+      const age = (this.wall - c.born) / CALLOUT_LIFE;
+      const fade = age < 0.6 ? 1 : 1 - (age - 0.6) / 0.4;
+      const pop = Math.min(1, age * 8);
+      // Above the strings, clear of their glow.
+      this.labels.add(glyph(c.text, c.style), c.x, TOP_Y + 0.45 + 0.3 * age, 0.25, 0.42 * (0.7 + 0.3 * pop), fade);
     }
   }
 

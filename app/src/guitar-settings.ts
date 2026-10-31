@@ -13,9 +13,19 @@ export interface GuitarValues {
   masterVolume: number;
   backingVolume: number;
   monitorVolume: number;
+  /** The song's own guitar, when its import kept it apart (MP3 imports): silent by default. */
+  stemVolume: number;
 }
 
-export const DEFAULT_GUITAR: GuitarValues = { inputGainDb: 0, inputOffsetMs: 0, visualOffsetMs: 0, masterVolume: 1, backingVolume: 0.85, monitorVolume: 0.9 };
+export const DEFAULT_GUITAR: GuitarValues = {
+  inputGainDb: 0,
+  inputOffsetMs: 0,
+  visualOffsetMs: 0,
+  masterVolume: 1,
+  backingVolume: 0.85,
+  monitorVolume: 0.9,
+  stemVolume: 0,
+};
 
 export const toDb = (x: number): number => (x > 0 ? 20 * Math.log10(x) : -Infinity);
 const fromDb = (db: number): number => 10 ** (db / 20);
@@ -25,7 +35,13 @@ const decimal = (x: number): string => (lang() === 'en' ? x.toString() : x.toStr
 /** What the engine applies. */
 export function engineSettings(v: GuitarValues): InputSettings {
   const master = v.masterVolume ?? 1;
-  return { inputGainDb: v.inputGainDb, inputOffsetMs: v.inputOffsetMs, backingVolume: (v.backingVolume * master) ** 2, monitorVolume: (v.monitorVolume * master) ** 2 };
+  return {
+    inputGainDb: v.inputGainDb,
+    inputOffsetMs: v.inputOffsetMs,
+    backingVolume: (v.backingVolume * master) ** 2,
+    monitorVolume: (v.monitorVolume * master) ** 2,
+    stemVolume: ((v.stemVolume ?? 0) * master) ** 2,
+  };
 }
 
 /**

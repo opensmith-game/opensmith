@@ -13,8 +13,8 @@ mod session;
 mod track;
 
 pub use calibration::{Calibration, CalibrationPlan, CalibrationResult, MIN_HITS};
-pub use events::{UiEvent, UiExpected, UiScore, UiTarget};
+pub use events::{UiEvent, UiExpected, UiMissReason, UiScore, UiTarget};
 pub use history::TapHistory;
 pub use runner::{Command, Devices, EngineBackend, Poll, SessionHandle};
 pub use session::{AudioBackend, RiffLoop, Session, SessionConfig};
-pub use track::{load_track, TrackError};
+pub use track::{load_track, load_track_with_stem, TrackError};

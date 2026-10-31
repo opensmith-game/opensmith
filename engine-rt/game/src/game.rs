@@ -6,12 +6,16 @@
 //! judged by the chord verifier, which the engine runs on the audio of the chords listed by
 //! `chords_ready`.
 //!
+//! A miss says why, from what the guitar played around the note: nothing, the right note too
+//! early or too late, another note (too high, too low), or a strum the verifier did not hear as
+//! the chord. A note played late enough to come after its miss explains it then (`Late`).
+//!
 //! Dynamic difficulty: every phrase name has its own level. When a phrase
 //! iteration is over, a good run (≥ `level_up` accuracy) raises that phrase's level, a poor one
 //! (< `level_down`) lowers it. The level of an iteration is fixed when it becomes visible,
 //! `lookahead` seconds before it starts, so notes never change under the player's eyes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::chart::Chart;
 
@@ -73,12 +77,31 @@ pub struct Expected {
     pub status: Status,
     /// Chords only: the verifier already looked at this strum.
     pub checked: bool,
+    /// Missed notes: why (what the chords' verifier found, before the miss).
+    pub reason: Option<MissReason>,
+}
+
+/// Why a note or chord was missed, from what the guitar played around it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MissReason {
+    /// Nothing heard that could be it.
+    Unplayed,
+    /// The right note (a strum, for a chord) outside the window, `error` seconds from the note's
+    /// time: negative when early.
+    Timing { error: f64 },
+    /// Another note in the window, `semitones` from the expected one: positive when too high.
+    Pitch { semitones: i32 },
+    /// Chords: strummed in time, but not heard as the chord.
+    WrongChord,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Judgement {
     Hit { index: usize, time: f64, error: f64, perfect: bool },
-    Miss { index: usize, time: f64 },
+    Miss { index: usize, time: f64, reason: MissReason },
+    /// A note already missed was played after all, `error` seconds late: the reason of its miss,
+    /// known only now.
+    Late { index: usize, error: f64 },
     PhraseDone { iteration: usize, name: String, accuracy: f64, level: u32, next_level: u32 },
 }
 
@@ -127,6 +150,10 @@ pub struct Game {
     start_at: f64,
     /// Only notes in this span are shown and judged (Loop Trainer); kept across restarts.
     range: (f64, f64),
+    /// What the guitar played lately that no note took, (attack, MIDI), to explain misses.
+    stray: VecDeque<(f64, i32)>,
+    /// Strums lately (pitch or not), for the misses of chords.
+    strums: VecDeque<f64>,
 }
 
 /// Extra time after a chord's hit window for its verification to come back.
@@ -134,6 +161,9 @@ const CHORD_GRACE: f64 = 0.1;
 /// Extra time after a note's hit window for the tracker to confirm its pitch: a note attacked
 /// late in the window is reported a few tens of milliseconds later (its attack time is judged).
 const NOTE_GRACE: f64 = 0.06;
+/// The right note this far from a missed one (and outside its window) was played too early or
+/// too late.
+const TIMING_SPAN: f64 = 0.35;
 
 impl Game {
     pub fn new(chart: Chart, cfg: GameConfig) -> Game {
@@ -148,6 +178,8 @@ impl Game {
             score: Score::default(),
             start_at: f64::NEG_INFINITY,
             range: (f64::NEG_INFINITY, f64::INFINITY),
+            stray: VecDeque::new(),
+            strums: VecDeque::new(),
         }
     }
 
@@ -159,6 +191,8 @@ impl Game {
         self.iterations = vec![Iteration::default(); self.chart.phrases.len()];
         self.next_iteration = 0;
         self.start_at = t;
+        self.stray.clear();
+        self.strums.clear();
         while self.next_iteration < self.chart.phrases.len() && self.chart.phrases[self.next_iteration].end <= t {
             self.iterations[self.next_iteration] = Iteration { activated: true, done: true, ..Iteration::default() };
             self.next_iteration += 1;
@@ -251,6 +285,7 @@ impl Game {
                         iteration: k,
                         status: Status::Pending,
                         checked: false,
+                        reason: None,
                     });
                 }
             }
@@ -264,6 +299,7 @@ impl Game {
                         iteration: k,
                         status: Status::Pending,
                         checked: false,
+                        reason: None,
                     });
                 }
             }
@@ -304,13 +340,87 @@ impl Game {
         if let Some((index, error)) = best {
             return Some(self.hit(index, error));
         }
+        self.strums.push_back(t);
         let in_chord = self.expected.iter().any(|e| {
             (e.time - t).abs() <= w + CHORD_GRACE && matches!(&e.target, Target::Chord { midis, .. } if midis.contains(&midi))
         });
-        if !in_chord {
-            self.score.extras += 1;
+        if in_chord {
+            return None;
         }
-        None
+        self.score.extras += 1;
+        self.stray.push_back((t, midi));
+        self.late(t, |target| matches!(target, Target::Note { midi: m, .. } if *m == midi))
+    }
+
+    /// The tracker heard an attack at `time` (song seconds), with or without a pitch: chords
+    /// strummed out of time say so.
+    pub fn on_strum(&mut self, time: f64) -> Option<Judgement> {
+        let t = time - self.cfg.input_offset;
+        self.strums.push_back(t);
+        if self.claimed(t, None) {
+            return None;
+        }
+        self.late(t, |target| matches!(target, Target::Chord { .. }))
+    }
+
+    /// A missed item of the kind `fits` takes, not explained by its timing yet, whose window
+    /// ended less than `TIMING_SPAN` before `t`: it was played late.
+    fn late(&mut self, t: f64, fits: impl Fn(&Target) -> bool) -> Option<Judgement> {
+        let w = self.cfg.hit_window;
+        let index = self.expected.iter().rposition(|e| {
+            e.status == Status::Missed
+                && fits(&e.target)
+                && t - e.time > w
+                && t - e.time <= TIMING_SPAN
+                && !matches!(e.reason, Some(MissReason::Timing { .. }))
+        })?;
+        let e = &mut self.expected[index];
+        let error = t - e.time;
+        e.reason = Some(MissReason::Timing { error });
+        Some(Judgement::Late { index, error })
+    }
+
+    /// Whether an attack at `t` belongs to another item than `index`: one in whose window it is.
+    fn claimed(&self, t: f64, index: Option<usize>) -> bool {
+        let w = self.cfg.hit_window;
+        self.expected.iter().enumerate().any(|(i, e)| Some(i) != index && (e.time - t).abs() <= w)
+    }
+
+    /// Why expected item `index` was missed.
+    fn reason(&self, index: usize) -> MissReason {
+        let e = &self.expected[index];
+        let w = self.cfg.hit_window;
+        let nearest = |times: &mut dyn Iterator<Item = f64>, span: f64| {
+            times.filter(|&a| (a - e.time).abs() <= span).min_by(|x, y| (x - e.time).abs().total_cmp(&(y - e.time).abs()))
+        };
+        match &e.target {
+            Target::Note { midi, .. } => {
+                let right = nearest(&mut self.stray.iter().filter(|s| s.1 == *midi).map(|s| s.0), TIMING_SPAN);
+                if let Some(a) = right {
+                    return MissReason::Timing { error: a - e.time };
+                }
+                let wrong = self
+                    .stray
+                    .iter()
+                    .filter(|s| (s.0 - e.time).abs() <= w)
+                    .min_by(|x, y| (x.0 - e.time).abs().total_cmp(&(y.0 - e.time).abs()));
+                match wrong {
+                    Some(&(_, m)) => MissReason::Pitch { semitones: m - midi },
+                    None => MissReason::Unplayed,
+                }
+            }
+            Target::Chord { .. } => {
+                if let Some(reason) = e.reason {
+                    return reason;
+                }
+                let strum = nearest(&mut self.strums.iter().copied().filter(|&a| !self.claimed(a, Some(index))), TIMING_SPAN);
+                match strum {
+                    Some(a) if (a - e.time).abs() > w => MissReason::Timing { error: a - e.time },
+                    Some(_) => MissReason::WrongChord,
+                    None => MissReason::Unplayed,
+                }
+            }
+        }
     }
 
     /// The autopilot (demo mode): every pending note and chord whose time has come is played,
@@ -347,11 +457,16 @@ impl Game {
             return None;
         }
         e.checked = true;
+        let error = attack.map(|a| a - self.cfg.input_offset - e.time);
         if !accepted {
+            if error.is_some() {
+                e.reason = Some(MissReason::WrongChord);
+            }
             return None;
         }
-        let error = attack.map_or(0.0, |a| a - self.cfg.input_offset - e.time);
+        let error = error.unwrap_or(0.0);
         if error.abs() > self.cfg.hit_window {
+            e.reason = Some(MissReason::Timing { error });
             return None;
         }
         Some(self.hit(index, error))
@@ -369,11 +484,21 @@ impl Game {
             let grace = if matches!(e.target, Target::Chord { .. }) { CHORD_GRACE } else { NOTE_GRACE };
             if e.status == Status::Pending && e.time + w + grace < t {
                 let time = e.time;
-                self.expected[index].status = Status::Missed;
+                let reason = self.reason(index);
+                let e = &mut self.expected[index];
+                e.status = Status::Missed;
+                e.reason = Some(reason);
                 self.score.misses += 1;
                 self.score.streak = 0;
-                out.push(Judgement::Miss { index, time });
+                out.push(Judgement::Miss { index, time, reason });
             }
+        }
+        let old = t - TIMING_SPAN - w - CHORD_GRACE;
+        while self.stray.front().is_some_and(|s| s.0 < old) {
+            self.stray.pop_front();
+        }
+        while self.strums.front().is_some_and(|&s| s < old) {
+            self.strums.pop_front();
         }
         for k in 0..self.iterations.len() {
             let it = self.iterations[k];

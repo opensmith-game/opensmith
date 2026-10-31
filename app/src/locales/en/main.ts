@@ -60,6 +60,8 @@ export const MAIN: Record<string, string> = {
   'Réglages rapides': 'Quick settings',
   'Accompagnement': 'Backing track',
   'Ta guitare': 'Your guitar',
+  'Guitare du morceau': 'Song’s guitar',
+  'La guitare de l’enregistrement, gardée à part à l’import : pour l’entendre jouer la partie.': 'The recording’s own guitar, kept apart on import: to hear how the part goes.',
   'Ampli': 'Amp',
   'Difficulté': 'Difficulty',
   'Auto · suit ton jeu': 'Auto · follows your playing',
@@ -236,6 +238,32 @@ export const MAIN: Record<string, string> = {
   'Phrase maîtrisée !': 'Phrase mastered!',
   'Phrase parfaite !': 'Perfect phrase!',
   'niveau {level}/{levels}': 'level {level}/{levels}',
+
+  // Why a note was missed, on the highway
+  'Trop tôt': 'Too early',
+  'Trop tard': 'Too late',
+  'Trop haut': 'Too high',
+  'Trop bas': 'Too low',
+  'Mauvais accord': 'Wrong chord',
+
+  // Results: why the notes were missed, the latency left
+  'Notes ratées : {list}': 'Missed notes: {list}',
+  '{n} trop tard': '{n} too late',
+  '{n} trop tôt': '{n} too early',
+  '{n} trop haute': '{n} too high',
+  '{n} trop hautes': '{n} too high',
+  '{n} trop basse': '{n} too low',
+  '{n} trop basses': '{n} too low',
+  '{n} mauvais accord': '{n} wrong chord',
+  '{n} mauvais accords': '{n} wrong chords',
+  '{n} pas jouée': '{n} not played',
+  '{n} pas jouées': '{n} not played',
+  'Tes notes arrivent en moyenne {ms} ms en retard, toujours à peu près pareil : c’est sans doute la latence.':
+    'Your notes land {ms} ms late on average, and steadily so: that is most likely latency.',
+  'Tes notes arrivent en moyenne {ms} ms en avance, toujours à peu près pareil : c’est sans doute la latence.':
+    'Your notes land {ms} ms early on average, and steadily so: that is most likely latency.',
+  'Compenser ({offset} ms)': 'Compensate ({offset} ms)',
+  'Compensation réglée à {offset} ms.': 'Compensation set to {offset} ms.',
 
   // Chart errors
   'ce fichier n\'est pas un chart OpenSmith': 'this file is not an OpenSmith chart',
