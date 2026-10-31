@@ -14,7 +14,7 @@ import { coverElement } from './cover';
 import { DemoEngine } from './engine/demo';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri, TauriEngine, type AudioStatus } from './engine/tauri';
-import type { Engine, SongEntry } from './engine/types';
+import { findSong, type Engine, type SongEntry } from './engine/types';
 import { DEFAULT_GUITAR, engineSettings, GuitarSettings, type GuitarValues } from './guitar-settings';
 import { accuracy, type GameEvent } from './game/types';
 import { missCounts, steadyOffset } from './game/timing';
@@ -23,7 +23,7 @@ import { Highway } from './highway/highway';
 import { isScenery, SCENERIES, type SceneryId } from './highway/scenery';
 import { Hud } from './hud';
 import { Imports } from './imports';
-import { Library, type LibraryPurpose } from './library';
+import { Library, partLabel, partsOf, type LibraryPurpose } from './library';
 import { gradeFor, record, recordAttack, recordPass, type Progress } from './progress';
 import { AttackHud, attackLevel, AttackRun, attackStartLevel, attackSummary, STRIKES, type AttackDifficulty } from './score-attack';
 import { accelerated, countNotes, percent, riffLoop, RiffPanel, roundSpeed, type PhraseState, type RiffChoice } from './riff';
@@ -894,9 +894,9 @@ async function openLibrary(purpose: LibraryPurpose): Promise<void> {
   if (mode === 'library') library.show(songs, progress, purpose);
 }
 
-/** The last song played, to pick up where the player left. */
+/** The last song played (in whichever arrangement), to pick up where the player left. */
 function lastPlayed(): SongEntry | null {
-  const played = songs.filter((s) => progress[s.id]?.lastPlayed);
+  const played = songs.flatMap(partsOf).filter((s) => progress[s.id]?.lastPlayed);
   played.sort((a, b) => progress[b.id]!.lastPlayed!.localeCompare(progress[a.id]!.lastPlayed!));
   return played[0] ?? null;
 }
@@ -916,7 +916,8 @@ function updateMenu(): void {
   resume.hidden = !last;
   if (!last) return;
   resume.dataset.song = last.id;
-  $('resumeTitle').textContent = `${last.title} · ${last.artist}`;
+  const part = songs.some((s) => s.others?.length && partsOf(s).includes(last)) ? ` · ${partLabel(last)}` : '';
+  $('resumeTitle').textContent = `${last.title} · ${last.artist}${part}`;
   const m = Math.round((progress[last.id]?.mastery ?? 0) * 100);
   const best = progress[last.id]?.bestGrade;
   $('resumeMeta').textContent = best ? t('Maîtrise {m} % · meilleure note {grade}', { m, grade: best }) : t('Maîtrise {m} %', { m });
@@ -949,7 +950,7 @@ function openImports(): void {
 }
 
 async function start(id: string, riffOpening = false): Promise<void> {
-  current = songs.find((s) => s.id === id) ?? null;
+  current = findSong(songs, id) ?? null;
   riffFirst = riffOpening;
   currentId = id;
   riff = null;

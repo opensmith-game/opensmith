@@ -287,6 +287,11 @@ def test_the_full_mixdown_becomes_the_backing_track(tmp_path):
     saved = Chart.load(out / "song_chart.json")
     assert saved.audio_backing == "song.wav" and saved.source_kind == "feedpak" and saved.title == chart.title
     assert not list(out.glob("feedpak-*")), "scratch files are removed"
+    # The other guitar arrangement goes beside it, bass aside (a six-string highway).
+    assert sorted(p.name for p in out.glob("song_chart.*.json")) == ["song_chart.rhythm.json"]
+    rhythm = Chart.load(out / "song_chart.rhythm.json")
+    assert (rhythm.arrangement_name, rhythm.arrangement_type, rhythm.audio_backing) == ("Rhythm", "rhythm", "song.wav")
+    assert rhythm.duration == saved.duration
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="decoding the stems needs ffmpeg")

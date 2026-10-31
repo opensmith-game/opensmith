@@ -6,6 +6,20 @@ import type { SongEntry } from './engine/types';
 import type { Progress, SongProgress } from './progress';
 import { partName } from './sections';
 
+/** A song's arrangements: the one it is listed by, then the others. */
+export const partsOf = (song: SongEntry): SongEntry[] => [song, ...(song.others ?? [])];
+
+/** An arrangement's name for the player: the usual ones in their language, the others as written. */
+export function partLabel(part: SongEntry): string {
+  const labels: Record<string, string> = { lead: 'Lead', rhythm: t('Rythmique'), combo: 'Combo', bass: t('Basse') };
+  return labels[part.arrangement.toLowerCase()] ?? part.arrangement;
+}
+
+/** The arrangement of `song` to show first: the kind the player last chose, if it has one. */
+export function preferredPart(song: SongEntry, kind: string | null): SongEntry {
+  return partsOf(song).find((p) => kind && p.arrangementType === kind) ?? song;
+}
+
 /** Where a song's notes come from, which says how much to trust them. */
 export type SongSource = 'tab' | 'chart' | 'ai' | 'sheet';
 
@@ -103,6 +117,8 @@ export interface LibraryHooks {
 }
 
 const ATTACK_CHOICE = 'opensmith.attackLevel';
+/** The kind of arrangement (lead, rhythm…) the player last chose. */
+const PART_CHOICE = 'opensmith.part';
 
 /** Numbers as the interface language writes them (12 345 or 12,345). */
 const number = (n: number): string => n.toLocaleString(lang() === 'en' ? 'en-US' : 'fr-FR');
@@ -129,8 +145,11 @@ export class Library {
   private progress: Progress = {};
   private query: SongQuery = { ...EVERY_SONG };
   private purpose: LibraryPurpose = 'play';
+  /** The song whose card is open, and the arrangement it shows. */
+  private chosenSong: SongEntry | null = null;
   private chosen: SongEntry | null = null;
   private attackChoice: AttackDifficulty = savedAttackChoice();
+  private partChoice: string | null = saved(PART_CHOICE);
 
   constructor(
     private readonly root: HTMLElement,
@@ -175,6 +194,9 @@ export class Library {
         case 'riff':
           if (id) this.hooks.riff(id);
           break;
+        case 'part':
+          if (id) this.choosePart(id);
+          break;
         case 'attack-level':
           this.chooseAttack(target.dataset.value as AttackDifficulty);
           break;
@@ -206,7 +228,7 @@ export class Library {
     for (let e: HTMLElement | null = this.grid(); e && e !== this.root.parentElement; e = e.parentElement) scrolled.push([e, e.scrollTop]);
     this.render();
     for (const [e, top] of scrolled) e.scrollTop = top;
-    if (this.chosen) this.grid().querySelector(`.song-tile[data-id="${CSS.escape(this.chosen.id)}"]`)?.classList.add('chosen');
+    if (this.chosenSong) this.tileOf(this.chosenSong)?.classList.add('chosen');
   }
 
   status(text: string, error = false): void {
@@ -219,6 +241,7 @@ export class Library {
   }
 
   closeCard(): void {
+    this.chosenSong = null;
     this.chosen = null;
     this.el.card.hidden = true;
     this.root.classList.remove('with-card');
@@ -227,6 +250,10 @@ export class Library {
 
   private grid(): HTMLElement {
     return this.el.grid;
+  }
+
+  private tileOf(song: SongEntry): HTMLElement | null {
+    return this.grid().querySelector<HTMLElement>(`.song-tile[data-id="${CSS.escape(song.id)}"]`);
   }
 
   private set(change: Partial<SongQuery>): void {
@@ -290,6 +317,7 @@ export class Library {
         <div class="t"></div>
         <div class="a"></div>
         <div class="tile-meta"><span class="badge"></span><span class="len"></span></div>
+        <div class="tile-parts" hidden></div>
         <div class="mastery"><i></i></div>
         <div class="mastery-text"></div>
       </div>`;
@@ -310,6 +338,13 @@ export class Library {
     tile.querySelector('.a')!.textContent = song.artist;
     tile.querySelector('.badge')!.textContent = song.tuning;
     tile.querySelector('.len')!.textContent = formatTime(song.duration);
+    const parts = partsOf(song);
+    const count = tile.querySelector<HTMLElement>('.tile-parts')!;
+    count.hidden = parts.length < 2;
+    if (parts.length > 1) {
+      count.textContent = t('{n} arrangements', { n: parts.length });
+      count.title = parts.map(partLabel).join(' · ');
+    }
     const m = Math.round((p?.mastery ?? 0) * 100);
     tile.querySelector<HTMLElement>('.mastery i')!.style.width = `${m}%`;
     tile.querySelector('.mastery-text')!.textContent = p?.plays ? `${t('Maîtrise {pct} %', { pct: m })} · ${tn(p.plays, '{n} partie', '{n} parties')}` : t('Jamais joué');
@@ -317,7 +352,7 @@ export class Library {
     tile.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (this.chosen?.id === song.id) this.primary(song);
+        if (this.chosenSong?.id === song.id && this.chosen) this.primary(this.chosen);
         else this.openCard(song, tile);
       }
     });
@@ -329,9 +364,12 @@ export class Library {
     else this.hooks.play(song.id);
   }
 
-  /** The chosen song in detail: where its notes come from, records, phrases, Play. */
-  private openCard(song: SongEntry, tile: HTMLElement): void {
-    this.chosen = song;
+  /** The chosen song in detail, in one of its arrangements: where its notes come from, records,
+   * phrases, Play. */
+  private openCard(main: SongEntry, tile: HTMLElement, part = preferredPart(main, this.partChoice)): void {
+    this.chosenSong = main;
+    this.chosen = part;
+    const song = part;
     this.grid().querySelectorAll('.song-tile.chosen').forEach((t) => t.classList.remove('chosen'));
     tile.classList.add('chosen');
     const p = this.progress[song.id];
@@ -342,6 +380,7 @@ export class Library {
       <div class="card-art"></div>
       <h3 class="card-title"></h3>
       <p class="card-artist"></p>
+      <div class="segmented card-parts" role="group" aria-label="${t('Arrangement')}"></div>
       <div class="card-badges"><span class="badge tuning"></span><span class="badge len"></span><span class="badge source"></span></div>
       <p class="card-about"></p>
       <dl class="card-stats"></dl>
@@ -352,6 +391,20 @@ export class Library {
     card.querySelector('.card-title')!.textContent = song.title;
     const by = [song.artist, song.album, song.year ? String(song.year) : null].filter(Boolean).join(' · ');
     card.querySelector('.card-artist')!.textContent = by;
+    const parts = partsOf(main);
+    const picker = card.querySelector<HTMLElement>('.card-parts')!;
+    picker.hidden = parts.length < 2;
+    picker.replaceChildren(
+      ...parts.map((p) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.lib = 'part';
+        b.dataset.id = p.id;
+        b.textContent = partLabel(p);
+        b.classList.toggle('on', p.id === part.id);
+        return b;
+      }),
+    );
     card.querySelector('.badge.tuning')!.textContent = song.tuning;
     card.querySelector('.badge.len')!.textContent = formatTime(song.duration);
     const sourceBadge = card.querySelector<HTMLElement>('.badge.source')!;
@@ -409,6 +462,17 @@ export class Library {
     this.root.classList.add('with-card');
   }
 
+  /** Another arrangement of the open song: its card, and the kind remembered for the next songs. */
+  private choosePart(id: string): void {
+    const main = this.chosenSong;
+    const part = main && partsOf(main).find((p) => p.id === id);
+    const tile = main && this.tileOf(main);
+    if (!main || !part || !tile) return;
+    this.partChoice = part.arrangementType ?? null;
+    store(PART_CHOICE, this.partChoice);
+    this.openCard(main, tile, part);
+  }
+
   /** Score Attack in the card: the difficulties with their records, and the button. */
   private attackSection(song: SongEntry): HTMLElement {
     const scores = this.progress[song.id]?.attack;
@@ -417,14 +481,27 @@ export class Library {
 
   private chooseAttack(key: AttackDifficulty): void {
     this.attackChoice = key;
-    try {
-      localStorage.setItem(ATTACK_CHOICE, key);
-    } catch {
-      // storage unavailable: the choice lasts for this session
-    }
+    store(ATTACK_CHOICE, key);
     const song = this.chosen;
     const section = this.el.card.querySelector('.card-attack');
     if (song && section) section.replaceWith(this.attackSection(song));
+  }
+}
+
+function saved(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null; // no storage
+  }
+}
+
+function store(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // storage unavailable: the choice lasts for this session
   }
 }
 

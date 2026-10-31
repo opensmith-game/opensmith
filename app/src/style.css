@@ -1690,6 +1690,22 @@ body.live .live-tools {
   font-size: 12.5px;
 }
 
+.tile-parts {
+  margin-top: 3px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tile-parts[hidden],
+.card-parts[hidden] {
+  display: none;
+}
+
+.card-parts {
+  margin: 0 0 10px;
+}
+
 .mastery {
   height: 5px;
   margin-top: 6px;

@@ -11,6 +11,8 @@ export interface SongEntry {
   duration: number;
   tuning: string;
   arrangement: string;
+  /** What it plays: "lead", "rhythm", "combo", "bass". */
+  arrangementType?: string;
   notes: number;
   chords: number;
   /** Library path of the song's picture, if any. */
@@ -28,6 +30,18 @@ export interface SongEntry {
   levelNotes?: number[];
   /** The part of the song (section name, as written) where each of `phrases` is first played. */
   phraseSections?: string[];
+  /** The song's other arrangements (rhythm, bass…), each with its own chart and progress. */
+  others?: SongEntry[];
+}
+
+/** A song entry by id, its other arrangements included. */
+export function findSong(songs: readonly SongEntry[], id: string): SongEntry | undefined {
+  for (const s of songs) {
+    if (s.id === id) return s;
+    const other = s.others?.find((o) => o.id === id);
+    if (other) return other;
+  }
+  return undefined;
 }
 
 export interface Frame {

@@ -26,6 +26,7 @@ interface Entry {
   duration: number;
   tuning: string;
   arrangement: string;
+  arrangementType: string;
   notes: number;
   chords: number;
   cover: string | null;
@@ -37,6 +38,8 @@ interface Entry {
   phrases: string[];
   phraseSections: string[];
   levelNotes: number[];
+  /** The song's other arrangements: the charts beside it (`song_chart.<part>.json`). */
+  others?: Entry[];
 }
 
 interface Span {
@@ -71,34 +74,47 @@ function scan(root: string, dir = root, depth = 0, out: Entry[] = []): Entry[] {
       continue;
     }
     if (name !== 'song_chart.json') continue;
-    try {
-      const c = JSON.parse(readFileSync(path, 'utf8'));
-      if (c.format !== 'opensmith-chart') continue;
-      const phrases = [...new Set<string>(c.phrases.map((p: Span) => p.name).filter((n: string) => !n.startsWith('rest')))];
-      out.push({
-        id: relative(root, path).split(sep).join('/'),
-        title: c.meta.title,
-        artist: c.meta.artist,
-        duration: c.meta.duration,
-        tuning: c.arrangement.tuning.name,
-        arrangement: c.arrangement.name,
-        notes: c.notes.length,
-        chords: c.chords.length,
-        cover: existsSync(join(dir, 'cover.jpg')) ? relative(root, join(dir, 'cover.jpg')).split(sep).join('/') : null,
-        album: c.meta.album ?? null,
-        year: c.meta.year ?? null,
-        source: c.meta.source?.kind ?? 'audio',
-        hasAudio: Boolean(c.audio?.backing),
-        maxDifficulty: c.arrangement.maxDifficulty ?? 0,
-        phrases,
-        phraseSections: phraseSections(c, phrases),
-        levelNotes: levelNotes(c),
-      });
-    } catch {
-      // not a chart
-    }
+    const entry = entryOf(root, path);
+    if (!entry) continue;
+    const others = readdirSync(dir)
+      .filter((n) => n.startsWith('song_chart.') && n.endsWith('.json') && n !== name)
+      .sort()
+      .flatMap((n) => entryOf(root, join(dir, n)) ?? []);
+    out.push(others.length ? { ...entry, others } : entry);
   }
   return out;
+}
+
+/** A library song as the chart at `path` describes it (null: not a chart). */
+function entryOf(root: string, path: string): Entry | null {
+  const dir = dirname(path);
+  try {
+    const c = JSON.parse(readFileSync(path, 'utf8'));
+    if (c.format !== 'opensmith-chart') return null;
+    const phrases = [...new Set<string>(c.phrases.map((p: Span) => p.name).filter((n: string) => !n.startsWith('rest')))];
+    return {
+      id: relative(root, path).split(sep).join('/'),
+      title: c.meta.title,
+      artist: c.meta.artist,
+      duration: c.meta.duration,
+      tuning: c.arrangement.tuning.name,
+      arrangement: c.arrangement.name,
+      arrangementType: c.arrangement.type ?? 'lead',
+      notes: c.notes.length,
+      chords: c.chords.length,
+      cover: existsSync(join(dir, 'cover.jpg')) ? relative(root, join(dir, 'cover.jpg')).split(sep).join('/') : null,
+      album: c.meta.album ?? null,
+      year: c.meta.year ?? null,
+      source: c.meta.source?.kind ?? 'audio',
+      hasAudio: Boolean(c.audio?.backing),
+      maxDifficulty: c.arrangement.maxDifficulty ?? 0,
+      phrases,
+      phraseSections: phraseSections(c, phrases),
+      levelNotes: levelNotes(c),
+    };
+  } catch {
+    return null; // not a chart
+  }
 }
 
 /** Development song library: /library/index.json lists the charts under ../out, /library/* serves their files. */

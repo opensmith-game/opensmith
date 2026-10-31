@@ -16,6 +16,7 @@ single level gets the five levels generated for Guitar Pro tabs, its fingering k
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import zipfile
@@ -500,9 +501,26 @@ def _backing_stems(manifest: dict) -> list[dict]:
     return on or stems
 
 
+def other_parts(arrangements: list[dict], chosen: dict) -> list[tuple[str, dict]]:
+    """The pack's guitar arrangements besides `chosen`, each with the part name of its chart file
+    (`song_chart.<part>.json`, from its id). Bass waits for a four-string highway."""
+    out: list[tuple[str, dict]] = []
+    for k, a in enumerate(arrangements):
+        if a is chosen or _is_bass(a):
+            continue
+        base = re.sub(r"[^a-z0-9]+", "-", str(a.get("id") or a.get("name") or "").lower()).strip("-") or f"part-{k + 1}"
+        part, n = base, 1
+        while part in (p for p, _ in out):
+            n += 1
+            part = f"{base}-{n}"
+        out.append((part, a))
+    return out
+
+
 def ingest_feedpak(path: Path, out_dir: Path, *, arrangement: str | None = None, progress: Sink | None = None) -> Chart:
     """A feedpak into `out_dir`: the chart, the mixdown as the backing track (48 kHz, 16 bits)
-    and the cover."""
+    and the cover. Without `arrangement`, the pack's other guitar arrangements go beside the
+    chart, as `song_chart.<part>.json`."""
     out_dir = Path(out_dir)
     steps = Progress(progress, {"decode": 0.8, "chart": 0.2})
     steps.stage("decode")
@@ -534,8 +552,17 @@ def ingest_feedpak(path: Path, out_dir: Path, *, arrangement: str | None = None,
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     steps.stage("chart")
-    chart, _ = load_feedpak(pack, arrangement, audio_seconds=mix.shape[1] / audio_io.ENGINE_RATE)
+    seconds = mix.shape[1] / audio_io.ENGINE_RATE
+    chart, _ = load_feedpak(pack, arrangement, audio_seconds=seconds)
     chart.audio_backing = BACKING
     chart.save(out_dir / "song_chart.json")
+    if arrangement is None:
+        for old in out_dir.glob("song_chart.*.json"):
+            old.unlink()
+        found = pack.arrangements()
+        for part, entry in other_parts(found, choose(found)):
+            other, _ = load_feedpak(pack, str(entry.get("id") or entry.get("name")), audio_seconds=seconds)
+            other.audio_backing = BACKING
+            other.save(out_dir / f"song_chart.{part}.json")
     steps.done()
     return chart

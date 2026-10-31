@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SongEntry } from '../src/engine/types';
-import { EVERY_SONG, fold, phraseMastery, selectSongs, sourceOf, tuningsOf } from '../src/library';
+import { EVERY_SONG, fold, partLabel, partsOf, phraseMastery, preferredPart, selectSongs, sourceOf, tuningsOf } from '../src/library';
+import { findSong, type SongEntry } from '../src/engine/types';
 import { emptyProgress, type Progress } from '../src/progress';
 
 const song = (id: string, title: string, artist: string, extra: Partial<SongEntry> = {}): SongEntry => ({
@@ -62,5 +62,37 @@ describe('library', () => {
       { name: 'C', label: 'Refrain', level: -1, levels: 5 },
       { name: 'Z', label: 'Phrase Z', level: -1, levels: 5 },
     ]);
+  });
+});
+
+describe('arrangements of a song', () => {
+  const part = (id: string, arrangement: string, arrangementType: string): SongEntry => ({
+    id,
+    title: 'Night Drive',
+    artist: 'A',
+    duration: 200,
+    tuning: 'E Standard',
+    arrangement,
+    arrangementType,
+    notes: 10,
+    chords: 0,
+  });
+  const song = { ...part('nd/song_chart.json', 'Lead', 'lead'), others: [part('nd/song_chart.bass.json', 'Bass', 'bass'), part('nd/song_chart.rhythm.json', 'Rhythm', 'rhythm')] };
+
+  it('lists the song first, then its other arrangements', () => {
+    expect(partsOf(song).map(partLabel)).toEqual(['Lead', 'Basse', 'Rythmique']);
+    expect(partsOf(part('x', 'Lead', 'lead'))).toHaveLength(1);
+  });
+
+  it('opens on the kind of arrangement chosen last, when the song has it', () => {
+    expect(preferredPart(song, 'rhythm').id).toBe('nd/song_chart.rhythm.json');
+    expect(preferredPart(song, 'combo').id).toBe(song.id);
+    expect(preferredPart(song, null).id).toBe(song.id);
+  });
+
+  it('finds an arrangement by its chart id', () => {
+    expect(findSong([song], 'nd/song_chart.bass.json')?.arrangement).toBe('Bass');
+    expect(findSong([song], song.id)).toBe(song);
+    expect(findSong([song], 'nope')).toBeUndefined();
   });
 });

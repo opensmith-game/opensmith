@@ -54,6 +54,8 @@ struct SongEntry {
     duration: f64,
     tuning: String,
     arrangement: String,
+    /// What it plays: "lead", "rhythm", "combo", "bass".
+    arrangement_type: String,
     notes: usize,
     chords: usize,
     /// The song's picture (library path), when it has one.
@@ -70,6 +72,9 @@ struct SongEntry {
     phrase_sections: Vec<String>,
     /// Notes and chords played at each level 0..max_difficulty.
     level_notes: Vec<usize>,
+    /// The song's other arrangements: the charts beside this one (`song_chart.<part>.json`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    others: Vec<SongEntry>,
 }
 
 #[derive(Serialize)]
@@ -173,21 +178,21 @@ impl Index {
             if path.file_name().is_none_or(|n| n != "song_chart.json") {
                 continue;
             }
-            let Some(stamp) = fs::metadata(&path).ok().and_then(|m| Some((m.modified().ok()?, m.len()))) else { continue };
-            let parsed = match known.remove(&path).filter(|p| p.stamp == stamp) {
-                Some(p) => p,
-                None => match parse_entry(root, &path, stamp) {
-                    Some(p) => p,
-                    None => continue,
-                },
-            };
-            let id = parsed.entry.id.clone();
+            let Some(parsed) = cached(root, &path, known) else { continue };
+            let mut entry = parsed.entry.clone();
+            for other in paths_beside(&path) {
+                if let Some(p) = cached(root, &other, known) {
+                    entry.others.push(p.entry.clone());
+                    seen.insert(other, p);
+                }
+            }
+            let id = entry.id.clone();
             let origin = fs::read_to_string(path.with_file_name(ORIGIN)).ok().and_then(|t| serde_json::from_str::<Origin>(&t).ok());
             if let Some(o) = origin {
                 self.by_source.entry(o.source).or_default().push(id.clone());
             }
             self.by_name.entry(parsed.file.clone()).or_default().push(id);
-            self.songs.push(parsed.entry.clone());
+            self.songs.push(entry);
             seen.insert(path, parsed);
         }
     }
@@ -197,6 +202,29 @@ impl Index {
         let name = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
         self.by_source.get(path.to_string_lossy().as_ref()).or_else(|| self.by_name.get(name.as_ref())).map_or(&[], Vec::as_slice)
     }
+}
+
+/// The chart at `path`, from `known` when it did not change since it was read.
+fn cached(root: &Path, path: &Path, known: &mut HashMap<PathBuf, Parsed>) -> Option<Parsed> {
+    let stamp = fs::metadata(path).ok().and_then(|m| Some((m.modified().ok()?, m.len())))?;
+    match known.remove(path).filter(|p| p.stamp == stamp) {
+        Some(p) => Some(p),
+        None => parse_entry(root, path, stamp),
+    }
+}
+
+/// The song's other arrangements beside its `song_chart.json`: `song_chart.<part>.json`, sorted.
+fn paths_beside(chart: &Path) -> Vec<PathBuf> {
+    let Some(Ok(entries)) = chart.parent().map(fs::read_dir) else { return Vec::new() };
+    let mut out: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name().map(|n| n.to_string_lossy()).is_some_and(|n| n.starts_with("song_chart.") && n.ends_with(".json") && n != "song_chart.json")
+        })
+        .collect();
+    out.sort();
+    out
 }
 
 /// A library song as its chart describes it.
@@ -214,6 +242,7 @@ fn parse_entry(root: &Path, path: &Path, stamp: (SystemTime, u64)) -> Option<Par
         duration: chart.meta.duration,
         tuning: chart.arrangement.tuning.name,
         arrangement: chart.arrangement.name,
+        arrangement_type: chart.arrangement.kind,
         notes: chart.notes.len(),
         chords: chart.chords.len(),
         album: chart.meta.album.clone(),
@@ -224,6 +253,7 @@ fn parse_entry(root: &Path, path: &Path, stamp: (SystemTime, u64)) -> Option<Par
         phrases,
         phrase_sections,
         level_notes,
+        others: Vec::new(),
     };
     Some(Parsed { stamp, entry, file: chart.meta.source.file })
 }
@@ -915,6 +945,27 @@ mod tests {
         fs::write(library.join("night-drive/song_chart.json"), chart("Night Drive (live)", "night-drive.mp3")).unwrap();
         assert_eq!(Index::of(&library, &charts).songs[0].title, "Night Drive (live)");
         assert_eq!(charts.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn the_other_arrangements_of_a_song_come_with_it() {
+        let library = scratch("arrangements").join("library");
+        fs::create_dir_all(library.join("night-drive")).unwrap();
+        let song = library.join("night-drive");
+        fs::write(song.join("song_chart.json"), chart("Night Drive", "night-drive.mp3")).unwrap();
+        let part = |name: &str, kind: &str| chart("Night Drive", "night-drive.mp3").replace(r#""name":"Lead","type":"lead""#, &format!(r#""name":"{name}","type":"{kind}""#));
+        fs::write(song.join("song_chart.rhythm.json"), part("Rhythm", "rhythm")).unwrap();
+        fs::write(song.join("song_chart.bass.json"), part("Bass", "bass")).unwrap();
+        let charts = Charts::default();
+        let songs = Index::of(&library, &charts).songs;
+        assert_eq!(songs.len(), 1, "one song, not three");
+        let parts: Vec<(&str, &str, &str)> =
+            songs[0].others.iter().map(|o| (o.id.as_str(), o.arrangement.as_str(), o.arrangement_type.as_str())).collect();
+        assert_eq!(parts, [("night-drive/song_chart.bass.json", "Bass", "bass"), ("night-drive/song_chart.rhythm.json", "Rhythm", "rhythm")]);
+        assert_eq!(charts.lock().unwrap().len(), 3, "each one cached");
+        let json = serde_json::to_value(&songs[0]).unwrap();
+        assert_eq!(json["others"][1]["arrangementType"], "rhythm");
+        assert!(json["others"][0].get("others").is_none());
     }
 
     #[test]
