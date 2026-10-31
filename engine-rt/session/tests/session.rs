@@ -580,3 +580,22 @@ fn another_output_keeps_the_guitar_settings_and_the_amp() {
     let default_amp = monitored(&mut fresh_in, &mut fresh_out, 200);
     assert!(heard > 0.0 && heard < default_amp / 3.0, "the quiet amp carried over: {heard} vs {default_amp}");
 }
+
+#[test]
+fn the_virtual_guitarist_is_judged_fairly() {
+    use opensmith_session::guitarist::{perform, Player};
+    use opensmith_session::replay::Agreement;
+    let chart = chart();
+    let judge = |player: &Player| {
+        let perf = perform(&chart, LEVEL, player, 3);
+        let events = replay(&perf.take, &EngineConfig::default(), config());
+        Agreement::of(&perf.truth, &events, &chart)
+    };
+    let clean = judge(&Player::clean());
+    println!("clean\n{clean}");
+    assert!(clean.fairness().0 >= 0.85, "a clean player counted: {:?}", clean.fairness());
+    let beginner = judge(&Player::beginner());
+    println!("beginner\n{beginner}");
+    let (right, wrong) = beginner.fairness();
+    assert!(right >= 0.6 && wrong >= 0.8, "a beginner: {right} of the right playing counted, {wrong} of the wrong refused");
+}

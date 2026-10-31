@@ -146,6 +146,12 @@ Puis ouvrir http://localhost:1420. Les morceaux sont ceux de `out/` (créés par
 
 **Sans réaccorder** : Réglages → Jeu → « Ma guitare reste accordée en » choisit l'accordage où ta guitare reste. Les morceaux qui en sont à quelques demi-tons (toutes les cordes décalées d’autant, 5 au plus) ou enregistrés hors du La 440 sont transposés à son accordage au chargement : même tempo, mêmes cases sur la partition. Au-delà de deux demi-tons, le son se dégrade un peu.
 
+**Guitariste virtuel** : pour régler la détection sans guitare, un guitariste de synthèse joue des partitions (propre, moyen ou débutant, avec des erreurs qu'il note), ses prises repassent dans tout le moteur, et le bilan dit ce que le jeu a compté ou refusé à tort :
+
+```bash
+cd engine-rt && cargo run --release -p opensmith-session --bin opensmith-simulate -- --player all --songs 24 ~/Music/OpenSmith
+```
+
 **Prises** : Réglages → Jeu → « Enregistrer ma guitare pendant les morceaux » garde chaque partie jouée au câble dans le dossier `.takes` de la bibliothèque (un dossier par partie, du lancement ou d'un saut à la fin ; pas le Loop Trainer ni le ralenti). Pour les rejouer dans le moteur tel qu'il est maintenant et comparer au score en direct :
 
 ```bash

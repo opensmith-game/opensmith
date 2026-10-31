@@ -8,6 +8,7 @@ pub mod chord;
 pub mod fft;
 pub mod fretboard;
 pub mod fx;
+pub mod guitar;
 pub mod note;
 pub mod onset;
 pub mod pitch;

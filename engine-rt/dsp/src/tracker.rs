@@ -34,6 +34,10 @@ pub enum Algorithm {
     Yin,
 }
 
+/// A pitch first measurable this long (ms) after its attack and its settling time belongs to a
+/// later note than that attack.
+const LATE_PITCH_MS: f32 = 20.0;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrackerConfig {
     pub pitch: PitchConfig,
@@ -461,6 +465,29 @@ impl NoteTracker {
                 emit(TrackerEvent::Onset { sample: onset });
             }
         }
+        // A pitch that shows up long after the attack (a chord strummed, then a note on its own
+        // a few tens of ms later, too soft against the ringing chord to be noticed) started when
+        // it could first have been measured, not at that attack.
+        let onset = if from.is_none() {
+            let sr = self.cfg.pitch.sample_rate;
+            let measurable = now.saturating_sub((self.detector.min_window_for(e.freq_hz) + self.cfg.hop) as u64);
+            let settle = (self.cfg.settle_ms * 1e-3 * sr) as u64;
+            if measurable > onset + settle + (LATE_PITCH_MS * 1e-3 * sr) as u64 {
+                // Where the sound rose the most since the attack, by 5 ms steps.
+                let step = (0.005 * sr) as u64;
+                let from = (onset + settle).max(now.saturating_sub(self.mask as u64 / 2) + 2 * step);
+                (from..=measurable)
+                    .step_by(step as usize / 4)
+                    .map(|t| (t, self.energy(t, t + step) / self.energy(t - 2 * step, t).max(1e-12)))
+                    .filter(|&(_, rise)| rise >= 2.0)
+                    .max_by(|a, b| a.1.total_cmp(&b.1))
+                    .map_or(onset, |(t, _)| t)
+            } else {
+                onset
+            }
+        } else {
+            onset
+        };
         emit(TrackerEvent::NoteOn {
             onset_sample: onset,
             sample: now,

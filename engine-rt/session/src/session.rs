@@ -18,9 +18,15 @@ const TAP_DELAY: f64 = 0.006;
 /// Attacks older than this are forgotten (s).
 const ATTACK_MEMORY: f64 = 2.0;
 /// Step between the windows searched for a chord whose strum the tracker did not notice (s).
-const SCAN_STEP: f64 = 0.015;
+const SCAN_STEP: f64 = 0.005;
 /// Tuner mode sends the pitch at most this often (s).
 const PITCH_EVERY: f64 = 0.02;
+/// How long a strum takes across the strings (s): a chord is checked up to this long after its
+/// attack.
+const STRUM: f64 = 0.05;
+/// A strum the tracker did not notice still makes the guitar this much louder (dB): over the
+/// 40 ms from it against the 45 ms before.
+const STRUM_RISE_DB: f32 = 2.0;
 /// Takes shorter than this are not kept (s).
 const MIN_TAKE: f64 = 10.0;
 
@@ -135,7 +141,7 @@ impl<B: AudioBackend> Session<B> {
             sent: 0,
             events: Vec::new(),
             history: TapHistory::new(1 << 18),
-            verifier: ChordVerifier::new(ChordConfig::default()),
+            verifier: ChordVerifier::new(chord_config()),
             scratch: Vec::new(),
             attacks: VecDeque::new(),
             last_score: Score::default(),
@@ -613,16 +619,32 @@ impl<B: AudioBackend> Session<B> {
                         .is_some_and(|audio| self.verifier.verify(audio, &pitches, a4).accepted)
                 };
                 // The strum's own audio as soon as it is in; failing that, at the end of the
-                // window, the chord anywhere in it (the tracker may not have noticed the strum).
-                let verdict = match attack {
-                    Some(a) if now >= a + window + TAP_DELAY && verify(a) => Some((true, Some(a))),
-                    _ if now >= at + w + window + TAP_DELAY => {
-                        let steps = (2.0 * w / SCAN_STEP).round() as usize;
-                        let found = (0..=steps).map(|k| at - w + k as f64 * SCAN_STEP).find(|&t| verify(t));
-                        Some((found.is_some(), attack.or(found)))
-                    }
-                    _ => None,
+                // window, the chord where the guitar got louder in it (the tracker may not have
+                // noticed the strum): a chord still ringing from earlier never does.
+                let history = &self.history;
+                // The steepest rise of the guitar between `from` and `to`: where a strum starts.
+                let steepest = |from: f64, to: f64| {
+                    let steps = ((to - from) / SCAN_STEP).round() as i64;
+                    (0..=steps)
+                        .map(|k| from + k as f64 * SCAN_STEP)
+                        .filter_map(|t| rise_db(monitor, &clock, history, t + offset, sr).map(|r| (t, r)))
+                        .filter(|&(_, r)| r >= STRUM_RISE_DB)
+                        .max_by(|x, y| x.1.total_cmp(&y.1))
                 };
+                let mut verdict = None;
+                if let Some(a) = attack.filter(|&a| now >= a + STRUM + window + TAP_DELAY) {
+                    // The strum takes a few tens of ms across the strings: checked as it ends
+                    // too, and then dated where the guitar got louder the most (the attack seen
+                    // may be a note just before the chord).
+                    if let Some(d) = [0.0, STRUM / 2.0, STRUM].into_iter().find(|&d| verify(a + d)) {
+                        let start = if d == 0.0 { a } else { steepest(a, a + d).map_or(a, |(t, _)| t) };
+                        verdict = Some((true, Some(start)));
+                    }
+                }
+                if verdict.is_none() && now >= at + w + STRUM + window + TAP_DELAY {
+                    let found = steepest(at - w, at + w).map(|(t, _)| t).filter(|&t| verify(t + STRUM / 2.0));
+                    verdict = Some((found.is_some(), found.or(attack)));
+                }
                 if let Some((accepted, at)) = verdict {
                     self.events.extend(game.on_chord(index, accepted, at).map(UiEvent::from));
                 }
@@ -713,6 +735,26 @@ fn strum_audio<'a>(
     }
     scratch.resize((window * sr) as usize, 0.0);
     history.read(first.round() as u64, scratch).then_some(&scratch[..])
+}
+
+/// What makes a chord count: three quarters of its notes heard (a string missed or let mute is
+/// fine), and no more than 40 % of the sound, nor a single peak within 9 dB of the loudest,
+/// unexplained by it. Measured with the virtual guitarist (`opensmith-simulate`) on charts of
+/// every kind: chords played right counted 85 % of the time (55 % when every note and almost
+/// no other sound was required), wrong ones refused 87 %.
+fn chord_config() -> ChordConfig {
+    ChordConfig { min_present: 0.75, max_foreign: 0.4, foreign_peak_db: -9.0, ..ChordConfig::default() }
+}
+
+/// How much louder (dB) the guitar is over the 40 ms from track time `t` than over the 45 ms
+/// before.
+fn rise_db(monitor: &Monitor, clock: &PlayerClock, history: &TapHistory, t: f64, sr: f64) -> Option<f32> {
+    let mean = |from: f64, secs: f64| {
+        let mut buf = Vec::new();
+        strum_audio(monitor, clock, history, &mut buf, from, secs, sr).map(|a| a.iter().map(|v| v * v).sum::<f32>() / a.len().max(1) as f32)
+    };
+    let (before, after) = (mean(t - 0.05, 0.045)?, mean(t, 0.04)?);
+    Some(10.0 * ((after + 1e-12) / (before + 1e-12)).log10())
 }
 
 /// The pitch heard (fractional MIDI) on the chart's scale: the recording's own tuning taken off

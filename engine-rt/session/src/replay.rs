@@ -194,3 +194,140 @@ impl fmt::Display for Report {
         )
     }
 }
+
+/// How the judging of a replayed performance agrees with what was played: for each kind of
+/// playing, how many items and how many the game counted as hits.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Agreement {
+    /// (what was played, deserves a hit, items, judged hits), in order of first appearance.
+    pub rows: Vec<(&'static str, bool, usize, usize)>,
+    /// What was played right but refused: (kind of item and technique, the reason given), count.
+    pub refused: Vec<(String, usize)>,
+    /// What was played wrong (or not at all) but counted: (kind of item and technique, what was
+    /// played), count.
+    pub counted: Vec<(String, usize)>,
+}
+
+impl Agreement {
+    pub fn of(truth: &[(bool, usize, crate::guitarist::Played)], events: &[UiEvent], chart: &opensmith_game::Chart) -> Agreement {
+        use std::collections::HashMap;
+        let mut item = HashMap::new();
+        let mut hit: HashMap<(bool, usize), bool> = HashMap::new();
+        let mut why: HashMap<(bool, usize), UiMissReason> = HashMap::new();
+        for e in events {
+            match e {
+                UiEvent::Expected { items, .. } => {
+                    item.extend(items.iter().map(|i| (i.index, (matches!(i.target, UiTarget::Chord { .. }), i.event))));
+                }
+                UiEvent::Hit { index, .. } | UiEvent::Miss { index, .. } => {
+                    if let Some(&key) = item.get(index) {
+                        hit.insert(key, matches!(e, UiEvent::Hit { .. }));
+                        if let UiEvent::Miss { reason, .. } = e {
+                            why.insert(key, *reason);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut a = Agreement::default();
+        for &(chord, event, played) in truth {
+            let Some(&judged) = hit.get(&(chord, event)) else { continue };
+            let tech = if chord { chart.chords[event].techniques.clone() } else { chart.notes[event].techniques.clone() }.unwrap_or_default();
+            let what = |tech: &opensmith_game::chart::Techniques| {
+                [
+                    (tech.mute == Some(true), "étouffé"),
+                    (tech.palm_mute == Some(true), "palm mute"),
+                    (tech.harmonic == Some(true) || tech.pinch_harmonic == Some(true), "harmonique"),
+                    (tech.hammer_on == Some(true) || tech.pull_off == Some(true), "lié"),
+                    (tech.slide_to.is_some(), "slide"),
+                    (tech.bend.is_some_and(|b| b > 0.0), "bend"),
+                ]
+                .iter()
+                .find(|k| k.0)
+                .map_or("", |k| k.1)
+            };
+            if !played.deserves_hit() && judged {
+                let key = format!("{} {} ← {}", if chord { "accord" } else { "note" }, what(&tech), played.label()).replace("  ", " ");
+                match a.counted.iter_mut().find(|r| r.0 == key) {
+                    Some(r) => r.1 += 1,
+                    None => a.counted.push((key, 1)),
+                }
+            }
+            if played.deserves_hit() && !judged {
+                let kind = what(&tech);
+                let reason = match why.get(&(chord, event)) {
+                    Some(UiMissReason::Unplayed) | None => "pas entendue",
+                    Some(UiMissReason::Timing { .. }) => "hors du temps",
+                    Some(UiMissReason::Pitch { .. }) => "mauvaise hauteur",
+                    Some(UiMissReason::WrongChord) => "mauvais accord",
+                };
+                let key = format!("{} {kind} → {reason}", if chord { "accord" } else { "note" }).replace("  ", " ");
+                match a.refused.iter_mut().find(|r| r.0 == key) {
+                    Some(r) => r.1 += 1,
+                    None => a.refused.push((key, 1)),
+                }
+            }
+            let label = played.label();
+            match a.rows.iter_mut().find(|r| r.0 == label) {
+                Some(r) => {
+                    r.2 += 1;
+                    r.3 += judged as usize;
+                }
+                None => a.rows.push((label, played.deserves_hit(), 1, judged as usize)),
+            }
+        }
+        a
+    }
+
+    pub fn add(&mut self, other: &Agreement) {
+        for (mine, theirs) in [(&mut self.refused, &other.refused), (&mut self.counted, &other.counted)] {
+            for r in theirs {
+                match mine.iter_mut().find(|s| s.0 == r.0) {
+                    Some(s) => s.1 += r.1,
+                    None => mine.push(r.clone()),
+                }
+            }
+        }
+        for r in &other.rows {
+            match self.rows.iter_mut().find(|s| s.0 == r.0) {
+                Some(s) => {
+                    s.2 += r.2;
+                    s.3 += r.3;
+                }
+                None => self.rows.push(*r),
+            }
+        }
+    }
+
+    /// Share of what was played right counted as hits, and of what was played wrong refused.
+    pub fn fairness(&self) -> (f64, f64) {
+        let share = |good: bool| {
+            let (n, ok) = self.rows.iter().filter(|r| r.1 == good).fold((0, 0), |(n, ok), r| (n + r.2, ok + if good { r.3 } else { r.2 - r.3 }));
+            if n == 0 { f64::NAN } else { ok as f64 / n as f64 }
+        };
+        (share(true), share(false))
+    }
+}
+
+impl fmt::Display for Agreement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (label, good, n, hits) in &self.rows {
+            let (verdict, k) = if *good { ("comptée", *hits) } else { ("refusée", n - hits) };
+            writeln!(f, "  {label:<30} {n:>7}   {verdict} {:>5.1} %", 100.0 * k as f64 / (*n).max(1) as f64)?;
+        }
+        let (right, wrong) = self.fairness();
+        write!(f, "  bien joué compté {:.1} %, mal joué refusé {:.1} %", 100.0 * right, 100.0 * wrong)?;
+        for (title, list) in [("bien joué mais refusé", &self.refused), ("mal joué mais compté", &self.counted)] {
+            let mut list = list.clone();
+            list.sort_by_key(|r| std::cmp::Reverse(r.1));
+            if !list.is_empty() {
+                write!(f, "\n  {title} :")?;
+                for (key, n) in list.iter().take(8) {
+                    write!(f, "\n    {n:>6}  {key}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}

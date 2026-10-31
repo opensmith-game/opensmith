@@ -7,8 +7,10 @@
 
 mod calibration;
 mod events;
+pub mod guitarist;
 mod history;
 pub mod replay;
+pub mod samples;
 mod runner;
 mod session;
 mod take;

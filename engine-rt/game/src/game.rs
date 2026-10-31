@@ -172,7 +172,7 @@ pub struct Game {
 }
 
 /// Extra time after a chord's hit window for its verification to come back.
-const CHORD_GRACE: f64 = 0.1;
+const CHORD_GRACE: f64 = 0.16;
 /// Extra time after a note's hit window for the tracker to confirm its pitch: a note attacked
 /// late in the window is reported a few tens of milliseconds later (its attack time is judged).
 const NOTE_GRACE: f64 = 0.06;
@@ -559,7 +559,7 @@ impl Game {
             return None;
         }
         let error = error.unwrap_or(0.0);
-        if error.abs() > self.cfg.hit_window {
+        if error.abs() > self.cfg.hit_window + 1e-9 {
             e.reason = Some(MissReason::Timing { error });
             return None;
         }
