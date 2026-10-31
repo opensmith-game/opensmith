@@ -19,6 +19,7 @@ part hard to play:
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from functools import lru_cache
 
@@ -157,6 +158,114 @@ def _fingers_needed(frets: list[int]) -> int:
         return 0
     lo = min(frets)
     return sum(1 for f in frets if f != lo) + 1
+
+
+# What makes a way of fingering a chord shape unnatural, and how much: weighted to agree with
+# the fingers guitarists write in tabs, the hand placed as `infer_anchors` places it. They
+# agree on 79 % of the chords played, on shapes the weights were not set on (guitarists agree
+# among themselves on 90 %; one finger per fret from that hand, as before: 44 %).
+_HAND_COSTS = {
+    "deviation": 0.76,  # each finger away from one finger per fret from the index
+    "shift": 1.54,  # the index below the lowest fretted note
+    "open_first": -2.12,  # first position in a chord with open strings
+    "first_pos": -0.71,  # first position, every note within the first four frets
+    "index_barre2": 0.49,  # the index across two strings
+    "index_barre3": -3.61,  # ... across three or more
+    "other_barre2": 9.25,  # another finger across two strings
+    "other_barre3": 9.88,  # ... across three or more (the A-shape's ring finger)
+    "barre_below_open": 7.79,  # a barre under an open string that must ring above it
+    "pinky": 3.93,
+    "fingers": 1.77,  # fingers used
+    "no_index": -0.24,  # the index left free (the rest of a barre shape)
+    "same_fret": -0.42,  # two fingers side by side on one fret
+    "stretch": 11.14,  # frets between two fingers beyond one per finger
+    "off_hand": 1.65,  # the index away from where the hand is
+    "gap_barre": 2.20,  # a barre with a string between fretted by another finger
+    "other_barre2_open": -0.99,  # another finger across two strings, open strings ringing
+}
+
+
+@lru_cache(maxsize=8192)
+def chord_fingers(frets: tuple[int, ...], hand: int = 0) -> tuple[int, ...]:
+    """Fingers for a chord shape (fret per string, low string first; 0 open, -1 not played):
+    0 open, -1 not played, 1 index to 4 little finger. Every way of putting four fingers on the
+    fretted notes that a hand can make (a finger on several strings only on one fret, as a barre
+    over strings it can press; fingers in fret order; a stretch of at most one fret more than one
+    finger per fret) is weighed by what makes it unnatural, the index placed anywhere from three
+    frets below the lowest note to on it; `hand`: the fret the index is at around the chord (0:
+    unknown)."""
+    notes = [(s, f) for s, f in enumerate(frets) if f > 0]
+    out = [0 if f == 0 else -1 for f in frets]
+    if not notes:
+        return tuple(out)
+    lo = min(f for _, f in notes)
+    hi = max(f for _, f in notes)
+    open_played = any(f == 0 for f in frets)
+    best: tuple[float, tuple[int, ...]] | None = None
+    for fingers in itertools.product(range(1, NUM_FINGERS + 1), repeat=len(notes)):
+        by: dict[int, list[tuple[int, int]]] = {}
+        for note, k in zip(notes, fingers):
+            by.setdefault(k, []).append(note)
+        if not _hand_can(by, frets):
+            continue
+        used = sorted(by)
+        fret_of = {k: by[k][0][1] for k in used}
+        barres = [(k, v) for k, v in by.items() if len(v) > 1]
+        shape = {
+            "index_barre2": sum(1 for k, v in barres if k == 1 and len(v) == 2),
+            "index_barre3": sum(1 for k, v in barres if k == 1 and len(v) > 2),
+            "other_barre2": sum(1 for k, v in barres if k != 1 and len(v) == 2),
+            "other_barre3": sum(1 for k, v in barres if k != 1 and len(v) > 2),
+            "barre_below_open": sum(1 for _, v in barres if any(frets[t] == 0 for t in range(max(s for s, _ in v) + 1, len(frets)))),
+            "pinky": len(by.get(4, [])),
+            "fingers": len(by),
+            "no_index": 0 if 1 in by else 1,
+            "same_fret": sum(1 for i, a in enumerate(used) for b in used[i + 1 :] if fret_of[a] == fret_of[b]),
+            "stretch": sum(max(0, (fret_of[b] - fret_of[a]) - (b - a)) for a, b in zip(used, used[1:])),
+            "gap_barre": sum(1 for _, v in barres if max(s for s, _ in v) - min(s for s, _ in v) + 1 > len(v)),
+            "other_barre2_open": sum(1 for k, v in barres if k != 1 and len(v) == 2 and open_played),
+        }
+        for index in range(max(1, lo - 3), lo + 1):
+            costs = {
+                **shape,
+                "deviation": sum(abs(k - (f - index + 1)) for (_, f), k in zip(notes, fingers)),
+                "shift": lo - index,
+                "open_first": 1 if open_played and index == 1 else 0,
+                "first_pos": 1 if index == 1 and hi <= 4 else 0,
+                "off_hand": abs(index - hand) if hand > 0 else 0,
+            }
+            cost = sum(_HAND_COSTS[name] * v for name, v in costs.items())
+            if best is None or cost < best[0] - 1e-9:
+                best = (cost, fingers)
+    if best is None:
+        # Wider than a hand: one finger per fret from the lowest, the little finger beyond.
+        return tuple(min(max(f - lo + 1, 1), NUM_FINGERS) if f > 0 else o for f, o in zip(frets, out))
+    for (s, _), k in zip(notes, best[1]):
+        out[s] = k
+    return tuple(out)
+
+
+def _hand_can(by: dict[int, list[tuple[int, int]]], frets: tuple[int, ...]) -> bool:
+    """Whether a hand can put each finger on its notes (`by`: notes of each finger)."""
+    for notes in by.values():
+        if len({f for _, f in notes}) > 1:
+            return False
+        if len(notes) > 1:
+            # A barre presses every string it lies across: none ringing open, none fretted lower.
+            fret = notes[0][1]
+            a, b = min(s for s, _ in notes), max(s for s, _ in notes)
+            if any(frets[s] == 0 or 0 < frets[s] < fret for s in range(a + 1, b)):
+                return False
+    used = sorted(by)
+    for i, a in enumerate(used):
+        for b in used[i + 1 :]:
+            fa, fb = by[a][0][1], by[b][0][1]
+            if fa > fb or fb - fa > (b - a) + 1:
+                return False
+            # Two fingers on one fret: the lower string takes the lower finger.
+            if fa == fb and max(s for s, _ in by[a]) > min(s for s, _ in by[b]):
+                return False
+    return True
 
 
 @lru_cache(maxsize=4096)

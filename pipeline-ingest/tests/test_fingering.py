@@ -163,3 +163,26 @@ def test_ascii_tab_renders_every_string():
     text = ascii_tab(tab)
     assert text.splitlines()[0].startswith("e|") and text.splitlines()[-1].startswith("E|")
     assert "1" in text.splitlines()[2]
+
+
+def test_chord_shapes_get_the_fingers_guitarists_use():
+    from opensmith_ingest.fingering import chord_fingers
+
+    # Fret per string from the low E (-1 not played) → finger (0 open, 1 index … 4 little finger).
+    expected = {
+        (0, 2, 2, 1, 0, 0): (0, 2, 3, 1, 0, 0),  # E
+        (0, 2, 2, 0, 0, 0): (0, 2, 3, 0, 0, 0),  # Em
+        (-1, 0, 2, 2, 2, 0): (-1, 0, 1, 2, 3, 0),  # A: no barre, the high E rings
+        (-1, 0, 2, 2, 1, 0): (-1, 0, 2, 3, 1, 0),  # Am
+        (-1, 3, 2, 0, 1, 0): (-1, 3, 2, 0, 1, 0),  # C
+        (-1, -1, 0, 2, 3, 2): (-1, -1, 0, 1, 3, 2),  # D
+        (-1, -1, 0, 2, 3, 1): (-1, -1, 0, 2, 3, 1),  # Dm
+        (1, 3, 3, 2, 1, 1): (1, 3, 4, 2, 1, 1),  # F: index barre
+        (-1, 2, 4, 4, 3, 2): (-1, 1, 3, 4, 2, 1),  # Bm
+        (-1, 2, 1, 2, 0, 2): (-1, 2, 1, 3, 0, 4),  # B7
+        (3, 5, 5, -1, -1, -1): (1, 3, 4, -1, -1, -1),  # G5
+    }
+    for frets, fingers in expected.items():
+        assert chord_fingers(frets, 1 if max(frets) <= 4 else 0) == fingers, frets
+    # Wider than a hand can hold: still a finger for every note.
+    assert all(f >= 1 for f in chord_fingers((1, -1, -1, -1, -1, 9), 0) if f != -1)

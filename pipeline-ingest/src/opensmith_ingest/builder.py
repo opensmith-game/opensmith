@@ -25,6 +25,7 @@ from .consensus import consensus as vote_repeats
 from .consensus import unify_fingering
 from .fingering import Fingered, FingeringSolver, Note, Tuning, Weights
 from .fingering import anchors as hand_anchors
+from .fingering import chord_fingers
 from .harmony import chord_core, chord_name
 
 MAX_DIFFICULTY = 4
@@ -129,29 +130,14 @@ class BeatGrid:
 
 
 def _template_for(sl: Fingered, keep: list[int], tuning: Tuning) -> tuple[tuple[int, ...], tuple[int, ...], str]:
-    """Frets/fingers/name of the shape made of the slice's notes at indices `keep`."""
+    """Frets/fingers/name of the shape made of the slice's notes at indices `keep`: the fingers
+    as a guitarist would put them, with the index where the hand is (above a capo, as from the nut)."""
     frets = [-1] * len(tuning.strings)
-    fingers = [-1] * len(tuning.strings)
-    fretted = []
     for k in keep:
         s, f = sl.placements[k]
         frets[s] = f
-        if tuning.is_open(f):
-            fingers[s] = 0
-        else:
-            fretted.append((f, s))
-    # One finger per fret from the anchor; several notes on the anchor fret are an index barre,
-    # several on another fret take consecutive fingers (open E: 0-2-3-1-0-0, F: 1-3-4-2-1-1).
-    fretted.sort()
-    on_anchor = sum(1 for f, _ in fretted if f == sl.anchor)
-    last = 0
-    for f, s in fretted:
-        if f == sl.anchor and on_anchor > 1:
-            finger = 1
-        else:
-            finger = max(f - sl.anchor + 1, last + 1)
-        fingers[s] = min(max(finger, 1), 4)
-        last = finger
+    above = tuple(-1 if f < 0 else 0 if tuning.is_open(f) else f - tuning.capo for f in frets)
+    fingers = chord_fingers(above, max(0, sl.anchor - tuning.capo))
     name = chord_name([sl.notes[k].pitch for k in keep])
     return tuple(frets), tuple(fingers), name
 

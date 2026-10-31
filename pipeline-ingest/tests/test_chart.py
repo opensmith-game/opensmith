@@ -179,7 +179,8 @@ def test_barre_and_same_fret_fingerings():
         full = max((t for t in chart.templates if t.name == name), key=lambda t: sum(f >= 0 for f in t.frets))
         shapes[name] = full.fingers
     assert shapes["F"] == [1, 3, 4, 2, 1, 1]
-    assert shapes["A"] == [-1, 0, 2, 3, 4, 0]
+    # Three fingers side by side rather than one per fret from the nut: how most tabs write it.
+    assert shapes["A"] == [-1, 0, 1, 2, 3, 0]
     assert shapes["C"] == [-1, 3, 2, 0, 1, 0]
 
 
