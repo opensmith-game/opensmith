@@ -6,7 +6,7 @@ Features come from `opensmith_dsp::notefeat` (the game's own code): 216 bins, th
 from MIDI 26, a frame every 10 ms. The network is small enough to run in the game, in Rust
 (`opensmith_dsp::notenet` reads the weights this script exports).
 
-uv run --project pipeline-ingest python models/notenet/train.py <data folder> <weights out> [steps]
+uv run --project pipeline-ingest python models/notenet/train.py <data folder> <weights out> [steps] [channels]
 """
 
 import json
@@ -163,11 +163,11 @@ def check(model, data: Pieces, path: Path, device):
             f.write(y.astype("<f4").tobytes())
 
 
-def main(folder: Path, out: Path, steps: int):
+def main(folder: Path, out: Path, steps: int, channels: int = 16):
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     train, val, real = Pieces(folder / "train"), Pieces(folder / "val"), Pieces(folder / "real")
     print(f"{len(train.items)} pieces to train on, {len(val.items)} to check, {len(real.items)} real takes ({device})", flush=True)
-    model = NoteNet().to(device)
+    model = NoteNet(channels).to(device)
     print(sum(p.numel() for p in model.parameters()), "parameters", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=3e-3, total_steps=steps)
@@ -193,4 +193,4 @@ def main(folder: Path, out: Path, steps: int):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else 20000)
+    main(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else 20000, int(sys.argv[4]) if len(sys.argv) > 4 else 16)

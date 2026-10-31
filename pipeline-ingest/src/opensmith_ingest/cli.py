@@ -126,6 +126,7 @@ def _parser() -> argparse.ArgumentParser:
     view.add_argument("--work", type=Path, default=Path.home() / ".cache" / "opensmith-bench")
     view.add_argument("--port", type=int, default=8765)
     view.add_argument("--library", type=Path, default=Path.home() / "Music" / "OpenSmith", help="the library the bench draws from (its size, for the coverage)")
+    view.add_argument("--trainings", type=Path, help="a folder of training descriptions (JSON, see bench_view.py): the page follows their logs")
 
     demo = sub.add_parser("demo", help="the generated demo song shipped with the app (backing track + chart)")
     demo.add_argument("-o", "--out", type=Path, required=True)
@@ -287,7 +288,7 @@ def _run(args: argparse.Namespace, emit: Emit | None) -> None:
     elif args.cmd == "bench-view":
         from .bench_view import serve
 
-        serve(args.work, args.port, args.library)
+        serve(args.work, args.port, args.library, args.trainings)
     elif args.cmd == "bench-guitarset":
         from .benchmark import evaluate, fetch_annotations
 

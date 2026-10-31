@@ -157,3 +157,43 @@ def test_runs_are_recorded_for_the_dashboard(tmp_path):
         assert api["latest"]["label"] == "better onsets"
     finally:
         httpd.shutdown()
+
+
+def test_trainings_are_followed_from_their_logs(tmp_path):
+    from opensmith_ingest.bench_view import trainings
+
+    # One log with a pace per step and a check on the next line, one with an elapsed time.
+    (tmp_path / "big.log").write_text(
+        "warming up\nstep 1000 loss 0.2 (2.50 s/step)\n  check F1 28.4 (R 23.0 P 37.2)\n"
+        "step 2000 loss 0.1 (2.60 s/step)\n  check F1 35.7 (R 36.7 P 34.8)\n", encoding="utf-8")
+    (tmp_path / "old.log").write_text("step 1000 loss 0.3 (1 s/step)\n  check F1 30.0\nbest check F1 30.0\n", encoding="utf-8")
+    (tmp_path / "eval.log").write_text("  test          (100 songs) F1  44.0  R  53.5\n", encoding="utf-8")
+    (tmp_path / "small.log").write_text(
+        "step 500 loss 0.1 val F1 80.0 real F1 56.9 (4000 attacks) 80 s\n"
+        "step 1000 loss 0.05 val F1 85.4 real F1 63.8 (4000 attacks) 170 s\n"
+        "best val F1 85.4, weights in out/notenet.bin\n", encoding="utf-8")
+    (tmp_path / "big.json").write_text(json.dumps({
+        "order": 1, "title": "Big", "log": "big.log", "steps": 4000,
+        "scores": [{"match": "check F1", "label": "check"}],
+        "compare": {"label": "old", "log": "old.log"},
+        "final": {"label": "test", "log": "eval.log", "pattern": r"^\s*test .*?F1\s+([\d.]+)"},
+    }), encoding="utf-8")
+    (tmp_path / "small.json").write_text(json.dumps({
+        "order": 2, "title": "Small", "log": "small.log", "steps": 1000,
+        "scores": [{"match": "real F1", "label": "real"}, {"match": "val F1", "label": "virtual"}],
+        "final": {"label": "test", "log": "missing.log", "pattern": "F1 ([\\d.]+)"},
+    }), encoding="utf-8")
+    (tmp_path / "gone.json").write_text(json.dumps({"log": "nowhere.log", "scores": [{"match": "F1"}]}), encoding="utf-8")
+
+    seen = {t["id"]: t for t in trainings(tmp_path)}
+    big, small = seen["big"], seen["small"]
+    assert big["status"] == "running" and big["step"] == 2000 and big["rate"] == 2.6
+    assert big["scores"][0]["curve"] == [(1000, 28.4), (2000, 35.7)], "a check is dated at the step before it"
+    assert big["compare"] == {"label": "old", "curve": [(1000, 30.0)]}, "the closing best is not a new point"
+    assert big["final"] == {"label": "test", "value": 44.0}
+    assert small["status"] == "finished" and small["rate"] == pytest.approx(0.18)
+    assert small["scores"][1]["curve"] == [(500, 80.0), (1000, 85.4)]
+    assert small["final"]["value"] is None
+    assert seen["gone"]["status"] == "missing"
+    # Nothing written for a while: stopped, not running.
+    assert trainings(tmp_path, now=big["updated"] + 3600)[0]["status"] == "stopped"

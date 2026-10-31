@@ -74,6 +74,19 @@
   .v0 { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
   .v1 { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
   .v2 { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .models { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 14px; }
+  .model { border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .model .mhead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .model .mhead b { font-size: 15px; }
+  .model p { margin: 0; color: var(--muted); }
+  .model .row { margin-top: 0; font-size: 12px; }
+  .model .score { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .model .score b { font-size: 30px; font-variant-numeric: tabular-nums; line-height: 1; }
+  .model .score span { color: var(--muted); }
+  .model ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .model ul li { margin: 2px 0; }
+  .model h3 { font-size: 12px; margin: 4px 0 0; color: var(--fg); font-weight: 600; }
+  .pill.done { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -85,6 +98,11 @@
   </header>
 
   <div class="grid">
+    <section class="card span12" id="models-card" hidden>
+      <h2>Les modèles</h2>
+      <div class="models" id="models"></div>
+      <div class="legend"><span>Un modèle apprend par « pas » : à chaque pas il voit un paquet d'exemples et se corrige un peu. De temps en temps, on le note sur des exemples qu'il n'a jamais vus : c'est la courbe.</span></div>
+    </section>
     <section class="card span12" id="coverage-card">
       <h2>Bibliothèque analysée</h2>
       <div class="banner">
@@ -343,8 +361,69 @@ function songs(run, previous) {
   table.innerHTML = head + (body || `<tr><td colspan="8" class="empty">Aucun morceau.</td></tr>`);
 }
 
+const num = (x, d = 1) => x == null ? '–' : x.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const STATUS = { running: ['en cours', 'pill live'], finished: ['terminé', 'pill done'], stopped: ['arrêté', 'pill'], missing: ['journal introuvable', 'pill'] };
+
+// The score `curve` had at `step` (its last point at or before it).
+const at = (curve, step) => { let v = null; for (const [s, x] of curve ?? []) if (s <= step) v = x; return v; };
+
+function curveSvg(t) {
+  const main = t.scores[0]?.curve ?? [], old = t.compare?.curve ?? [], targets = t.targets ?? [];
+  const values = [...main, ...old].map(([, v]) => v).concat(targets.map((x) => x.value));
+  if (!main.length) return `<div class="empty">Première note au premier contrôle${t.step ? ` (pas ${t.step.toLocaleString('fr-FR')} pour l’instant)` : ''}.</div>`;
+  const W = 600, H = 150, L = 34, R = 10, T = 8, B = 22;
+  const end = Math.max(t.steps ?? 0, t.step, ...main.map(([s]) => s), ...old.map(([s]) => s)) || 1;
+  const lo = Math.max(0, Math.floor(Math.min(...values) - 3)), hi = Math.min(100, Math.ceil(Math.max(...values) + 3));
+  const xs = (s) => L + (W - L - R) * s / end, ys = (v) => T + (1 - (v - lo) / Math.max(1, hi - lo)) * (H - T - B);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Note au fil des pas">`;
+  for (const v of [lo, (lo + hi) / 2, hi]) svg += `<line x1="${L}" x2="${W - R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L - 5}" y="${ys(v) + 4}" text-anchor="end">${Math.round(v)}</text>`;
+  svg += `<text x="${L}" y="${H - 5}">0</text><text x="${W - R}" y="${H - 5}" text-anchor="end">${end.toLocaleString('fr-FR')} pas</text>`;
+  for (const x of targets) svg += `<line x1="${L}" x2="${W - R}" y1="${ys(x.value)}" y2="${ys(x.value)}" stroke="var(--good)" stroke-dasharray="5 4"/><text x="${W - R - 4}" y="${ys(x.value) - 4}" text-anchor="end" style="fill:var(--good)">${esc(x.label)} : ${num(x.value)}</text>`;
+  if (old.length) svg += `<polyline fill="none" stroke="var(--mix)" stroke-width="2" stroke-dasharray="4 4" points="${old.map(([s, v]) => `${xs(s)},${ys(v)}`).join(' ')}"/>`;
+  svg += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${main.map(([s, v]) => `${xs(s)},${ys(v)}`).join(' ')}"/>`;
+  svg += main.map(([s, v]) => `<circle cx="${xs(s)}" cy="${ys(v)}" r="3.5" fill="var(--accent)"><title>pas ${s.toLocaleString('fr-FR')} : ${num(v)}</title></circle>`).join('');
+  return svg + '</svg>';
+}
+
+function models(list) {
+  const card = document.getElementById('models-card');
+  card.hidden = !list?.length;
+  if (card.hidden) return;
+  document.getElementById('models').innerHTML = list.map((t) => {
+    const [word, cls] = STATUS[t.status] ?? STATUS.missing;
+    const main = t.scores[0], curve = main?.curve ?? [];
+    const latest = curve.length ? curve[curve.length - 1][1] : null;
+    const best = curve.length ? Math.max(...curve.map(([, v]) => v)) : null;
+    const share = t.steps ? Math.min(1, t.step / t.steps) : 0;
+    const color = t.status === 'running' ? 'var(--accent)' : t.status === 'finished' ? 'var(--good)' : 'var(--mix)';
+    const since = t.updated ? Date.now() / 1000 - t.updated : null;
+    const when = t.status === 'running' && t.rate && t.steps ? `fin dans ~${dur(t.rate * Math.max(0, t.steps - t.step))}`
+      : t.status === 'finished' ? 'entraînement fini'
+      : t.status === 'stopped' && since != null ? `rien de neuf depuis ${dur(since)}` : '';
+    const then = t.compare ? at(t.compare.curve, curve.length ? curve[curve.length - 1][0] : 0) : null;
+    const versus = latest != null && then != null
+      ? `<span class="${latest >= then ? 'up' : 'down'}">${latest >= then ? '+' : '−'}${num(Math.abs(latest - then))}</span> par rapport à ${esc(t.compare.label)} au même pas` : '';
+    const others = t.scores.slice(1).map((s) => s.curve.length ? `${esc(s.label)} : <b>${num(s.curve[s.curve.length - 1][1])}</b>` : '').filter(Boolean).join(' · ');
+    const final = t.final ? `${esc(t.final.label)} : <b>${t.final.value == null ? 'à la fin' : num(t.final.value)}</b>` : '';
+    const legend = [`<span><i style="background:var(--accent)"></i>${esc(main?.label ?? 'note')}</span>`]
+      .concat(t.compare ? [`<span><i style="background:var(--mix)"></i>${esc(t.compare.label)}</span>`] : []).join('');
+    return `<article class="model">
+      <div class="mhead"><b>${esc(t.title)}</b><span class="${cls}">${word}</span>${t.note ? `<span class="pill">${esc(t.note)}</span>` : ''}</div>
+      ${t.about ? `<p>${esc(t.about)}</p>` : ''}
+      <div class="bar"><i style="width:${100 * share}%;background:${color}"></i></div>
+      <div class="row"><span>pas ${t.step.toLocaleString('fr-FR')}${t.steps ? ` / ${t.steps.toLocaleString('fr-FR')} (${Math.round(100 * share)} %)` : ''}</span><span>${when}</span></div>
+      <div class="score"><b>${num(latest)}</b><span>/ 100 · ${esc(main?.label ?? '')}</span></div>
+      <div class="row"><span>${best != null ? `meilleure : ${num(best)}` : ''}${versus ? ` · ${versus}` : ''}</span><span>${[others, final].filter(Boolean).join(' · ')}</span></div>
+      ${curveSvg(t)}
+      <div class="legend" style="margin-top:0">${legend}</div>
+      ${t.built?.length ? `<h3>Comment il est construit</h3><ul>${t.built.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+    </article>`;
+  }).join('');
+}
+
 function render(state) {
   last = state;
+  models(state.trainings);
   coverage(state.coverage);
   plain(state.latest, state.runs ?? []);
   progress(state.progress);
