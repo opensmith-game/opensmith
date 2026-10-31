@@ -52,6 +52,8 @@ class Stems:
 def best_device() -> str:
     import torch
 
+    if torch.cuda.is_available():
+        return "cuda"
     return "mps" if torch.backends.mps.is_available() else "cpu"
 
 

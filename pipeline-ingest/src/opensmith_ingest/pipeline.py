@@ -98,9 +98,9 @@ def transcribe(guitar_path: Path) -> list[transcription.RawNote]:
     """Basic Pitch on the guitar stem, cached in its folder."""
     cache = guitar_path.with_name(TRANSCRIPTION_CACHE)
     if cache.exists():
-        return [transcription.RawNote(**n) for n in json.loads(cache.read_text())]
+        return [transcription.RawNote(**n) for n in json.loads(cache.read_text(encoding="utf-8"))]
     raw = transcription.basic_pitch(guitar_path)
-    cache.write_text(json.dumps([asdict(n) for n in raw]))
+    cache.write_text(json.dumps([asdict(n) for n in raw]), encoding="utf-8")
     return raw
 
 
@@ -286,7 +286,7 @@ def _note_tab(out_dir: Path, tab: Path, track: int | None, confirmed: float) -> 
     """Remembers, next to the chart, which tab it was made from (the app reads it too)."""
     st = Path(tab).stat()
     record = {"source": str(Path(tab).resolve()), "size": st.st_size, "modified": int(st.st_mtime), "track": track, "confirmed": round(confirmed, 3)}
-    (out_dir / TAB_RECORD).write_text(json.dumps(record, indent=2))
+    (out_dir / TAB_RECORD).write_text(json.dumps(record, indent=2), encoding="utf-8")
 
 
 def _applied_tab(out_dir: Path) -> Path | None:
@@ -294,7 +294,7 @@ def _applied_tab(out_dir: Path) -> Path | None:
     record = out_dir / TAB_RECORD
     if not record.exists():
         return None
-    source = json.loads(record.read_text()).get("source")
+    source = json.loads(record.read_text(encoding="utf-8")).get("source")
     return Path(source) if source and Path(source).is_file() else None
 
 
@@ -318,7 +318,7 @@ def rechart(out_dir: Path, *, consensus: bool = True, report: dict | None = None
     guitar_path = out_dir / old.audio_guitar
     origin = out_dir / "import.json"
     if not (out_dir / COVER).exists() and origin.exists():
-        source = Path(json.loads(origin.read_text()).get("source", ""))
+        source = Path(json.loads(origin.read_text(encoding="utf-8")).get("source", ""))
         if source.is_file():
             audio_io.extract_cover(source, out_dir / COVER)
     raw = transcribe(guitar_path)

@@ -703,8 +703,8 @@ fn pipeline(resources: Option<PathBuf>, data: Option<PathBuf>) -> Option<Pipelin
     Pipeline::bundled(&resources, &data?)
 }
 
-/// `OPENSMITH_LIBRARY`, else ~/Music/OpenSmith (a development build: the repository's `out`
-/// folder when there is one).
+/// `OPENSMITH_LIBRARY`, else OpenSmith in the music folder (a development build: the
+/// repository's `out` folder when there is one).
 fn library_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("OPENSMITH_LIBRARY") {
         return dir.into();
@@ -713,8 +713,8 @@ fn library_dir() -> PathBuf {
     if cfg!(debug_assertions) && dev.is_dir() {
         return dev.canonicalize().unwrap_or(dev);
     }
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-    home.join("Music/OpenSmith")
+    // The system's music folder: ~/Music, XDG_MUSIC_DIR (named in the user's language), Windows' Music.
+    dirs::audio_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Music")).join("OpenSmith")
 }
 
 /// Written in the library once the demo song was put in it: a player who deletes it does not

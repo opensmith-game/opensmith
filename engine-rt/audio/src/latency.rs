@@ -139,12 +139,11 @@ mod mac {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(target_os = "macos")]
     fn the_default_output_stream_latency_is_read() {
         let ns = stream_latency_ns(None, true);
         println!("default output stream latency {:.1} ms", ns as f64 * 1e-6);

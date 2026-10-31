@@ -65,7 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     audio.add_argument("-o", "--out", type=Path)
     audio.add_argument("--title", help="default: the file's tags, else its name")
     audio.add_argument("--artist", help="default: the file's tags, else its name")
-    audio.add_argument("--device", choices=["mps", "cpu"])
+    audio.add_argument("--device", choices=["cuda", "mps", "cpu"])
     audio.add_argument("--tuning", choices=["auto", *TUNINGS], default="auto")
     audio.add_argument("--capo", type=int, default=0)
     audio.add_argument("--stem", choices=["auto", "guitar", "other", "guitar+other"], default="auto")

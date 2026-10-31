@@ -10,7 +10,10 @@
 use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::io::{BufRead, BufReader};
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Condvar, Mutex};
@@ -157,10 +160,12 @@ pub struct Pipeline {
 
 /// Finds uv where its installer or Homebrew put it; the PATH that goes with it.
 fn find_uv() -> Option<(PathBuf, String)> {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-    let mut dirs = vec![home.join(".local/bin"), home.join(".cargo/bin"), "/opt/homebrew/bin".into(), "/usr/local/bin".into()];
+    let home = dirs::home_dir().unwrap_or_default();
+    let mut dirs = vec![home.join(".local/bin"), home.join(".cargo/bin")];
+    #[cfg(unix)]
+    dirs.extend(["/opt/homebrew/bin".into(), "/usr/local/bin".into()]);
     dirs.extend(std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect::<Vec<_>>()).unwrap_or_default());
-    let program = dirs.iter().map(|d| d.join("uv")).find(|p| p.is_file())?;
+    let program = dirs.iter().map(|d| d.join(format!("uv{}", std::env::consts::EXE_SUFFIX))).find(|p| p.is_file())?;
     let path = std::env::join_paths(&dirs).ok()?.to_string_lossy().into_owned();
     Some((program, path))
 }
@@ -194,17 +199,30 @@ impl Pipeline {
         let mut cmd = Command::new(&self.program);
         cmd.args(&self.args).arg(sub).arg(file).arg("-o").arg(out).arg("--progress-json");
         cmd.env("PATH", &self.path).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        cmd.process_group(0);
-        // SAFETY: setpriority is async-signal-safe; nothing else runs between fork and exec.
-        unsafe {
-            cmd.pre_exec(|| {
-                libc::setpriority(libc::PRIO_PROCESS, 0, 10);
-                Ok(())
-            });
+        #[cfg(unix)]
+        {
+            cmd.process_group(0);
+            // SAFETY: setpriority is async-signal-safe; nothing else runs between fork and exec.
+            unsafe {
+                cmd.pre_exec(|| {
+                    libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+                    Ok(())
+                });
+            }
         }
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW);
         cmd
     }
 }
+
+#[cfg(windows)]
+const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+#[cfg(windows)]
+const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+/// No console window flashing up for the pipeline (the app has none).
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// A built app's pipeline: its sources and the chart schema, copied from the app's resources
 /// into `home` as they are laid out in the repository (`pipeline-ingest/`, `schema/`), then
@@ -250,7 +268,8 @@ impl Install {
     /// Is the copy missing, unfinished or older than the app's?
     pub fn needed(&self) -> bool {
         let done = fs::read_to_string(self.project().join(INSTALLED)).unwrap_or_default();
-        done.trim() != self.fingerprint() || !self.project().join(".venv/bin/python").exists()
+        let python = if cfg!(windows) { ".venv/Scripts/python.exe" } else { ".venv/bin/python" };
+        done.trim() != self.fingerprint() || !self.project().join(python).exists()
     }
 
     /// Copies the sources over the previous ones (the Python environment stays, `uv sync`
@@ -286,7 +305,10 @@ impl Install {
         // Inexact: the plugins installed in the environment stay.
         cmd.args(["sync", "--project"]).arg(self.project()).args(["--frozen", "--no-dev", "--inexact"]);
         cmd.env("PATH", path).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+        #[cfg(unix)]
         cmd.process_group(0);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
         cmd
     }
 }
@@ -318,6 +340,7 @@ impl SyncProgress {
 }
 
 /// Stops a pipeline and everything it started.
+#[cfg(unix)]
 fn kill_group(pgid: u32) {
     // SAFETY: a plain signal to a process group we started.
     unsafe {
@@ -325,8 +348,27 @@ fn kill_group(pgid: u32) {
     }
 }
 
+/// Stops a pipeline and everything it started: Windows has no group to signal, the tree of
+/// processes under it is ended.
+#[cfg(windows)]
+fn kill_group(pid: u32) {
+    let _ = Command::new("taskkill").args(["/T", "/F", "/PID", &pid.to_string()]).creation_flags(CREATE_NO_WINDOW).output();
+}
+
+/// A pipeline left running by an app that quit without stopping it (a crash) is stopped, if
+/// that process is still an OpenSmith import.
+#[cfg(windows)]
+fn stop_stale(pid: u32) {
+    let query = format!("(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine");
+    let Ok(out) = Command::new("powershell").args(["-NoProfile", "-Command", &query]).creation_flags(CREATE_NO_WINDOW).output() else { return };
+    if String::from_utf8_lossy(&out.stdout).contains("opensmith-ingest") {
+        kill_group(pid);
+    }
+}
+
 /// A pipeline left running by an app that quit without stopping it (a crash) is stopped, if
 /// that process group is still an OpenSmith import.
+#[cfg(unix)]
 fn stop_stale(pgid: u32) {
     let Ok(ps) = Command::new("/bin/ps").args(["-A", "-o", "pgid=,command="]).output() else { return };
     let ours = String::from_utf8_lossy(&ps.stdout).lines().any(|l| {

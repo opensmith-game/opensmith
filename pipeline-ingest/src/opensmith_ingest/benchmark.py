@@ -41,7 +41,7 @@ class TrueNote:
 
 
 def load_jams(path: Path, tuning: Tuning = Tuning()) -> list[TrueNote]:
-    doc = json.loads(path.read_text())
+    doc = json.loads(path.read_text(encoding="utf-8"))
     notes = []
     for ann in doc["annotations"]:
         if ann["namespace"] != "note_midi":

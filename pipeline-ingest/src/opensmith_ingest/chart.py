@@ -23,7 +23,7 @@ GENERATOR = f"opensmith-ingest {__version__}"
 
 @lru_cache(maxsize=1)
 def schema() -> dict:
-    return json.loads(SCHEMA_PATH.read_text())
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
 def validate(doc: dict) -> None:
@@ -184,7 +184,7 @@ class Chart:
     def save(self, path: Path) -> dict:
         doc = self.to_dict()
         validate(doc)
-        Path(path).write_text(json.dumps(doc, indent=1, ensure_ascii=False))
+        Path(path).write_text(json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8")
         return doc
 
     @classmethod
@@ -228,7 +228,7 @@ class Chart:
 
     @classmethod
     def load(cls, path: Path) -> Chart:
-        return cls.from_dict(json.loads(Path(path).read_text()))
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def events_at(self, level: int) -> tuple[list[ChartNote], list[ChartChord]]:
         """Notes and chords shown at difficulty `level` (the same level for every phrase)."""

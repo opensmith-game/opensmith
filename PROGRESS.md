@@ -1,6 +1,6 @@
 # OpenSmith — État d'avancement
 
-_Dernière mise à jour : 2026-10-28 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, Python 3.11 (uv)_
+_Dernière mise à jour : 2026-10-31 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, Python 3.11 (uv)_
 
 | Étape | Contenu | État |
 |---|---|---|
@@ -23,6 +23,14 @@ _Dernière mise à jour : 2026-10-28 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, P
 - **Morceau de démo** : « First Riff » (OpenSmith), généré par `opensmith-ingest demo` (basse et batterie synthétiques, partition exacte de la guitare), 41 s, dans `app/demo` ; posé dans la bibliothèque au premier lancement (une seule fois), servi aussi par la version navigateur sans `out/`.
 - **Licence** : GPL-3.0-or-later (`LICENSE`, déclarée dans les manifestes Cargo, npm et Python) ; composants tiers dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **CI** : GitHub Actions (`.github/workflows/ci.yml`) : tests Rust du moteur et de l'app (macOS), `tsc` + Vitest, pytest rapide (macOS, avec ffmpeg) ; `CONTRIBUTING.md`, modèles d'issues et de PR.
+
+### Windows et Linux : ça compile, pas encore jouable
+
+- **`cargo check` passe** pour `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu` et `aarch64-unknown-linux-gnu` (moteur et app), vérifié depuis le Mac sans machine Windows ni Linux (un `pkg-config` et un `llvm-rc` factices remplacent les bibliothèques du système visé). Rien n'a encore été édité en liens ni joué sur ces systèmes.
+- **Horloge corrigée** : hors macOS, `host_now_ns()` comptait depuis son premier appel, sans rapport avec les horodatages de cpal : les notes auraient été jugées à côté. Elle lit QueryPerformanceCounter sous Windows (WASAPI) et CLOCK_MONOTONIC sous Linux (PipeWire).
+- **Import sous Windows** : convertisseur (et son installation) dans son propre groupe de processus, sous la priorité du jeu, sans fenêtre de console, arrêté avec `taskkill /T` ; `uv.exe` trouvé ; le Python du convertisseur installé cherché dans `.venv\Scripts` ; bibliothèque dans le dossier Musique du système (aussi `XDG_MUSIC_DIR` sous Linux) ; icône Windows.
+- **Convertisseur** : UTF-8 explicite (Windows écrit en cp1252, un titre accentué rendait le chart illisible) ; CUDA utilisé quand il est là.
+- **Reste à faire** : latence sous Windows (cpal ne fait que du WASAPI partagé, 25 à 40 ms : il faudra le mode exclusif ou ASIO) ; sous Linux, l'hôte PipeWire de cpal, le choix du bon périphérique ALSA (le câble y apparaît plusieurs fois sous le même nom) et la 3D à 60 images/s dans la vue web.
 
 ---
 
