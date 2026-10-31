@@ -479,20 +479,24 @@ impl<B: AudioBackend> Session<B> {
         for (time, midi, cents) in heard {
             self.events.push(UiEvent::Heard { time, midi, cents });
             if clock.playing {
-                self.events.extend(game.on_note(time, retuned(midi, cents, self.cents)).map(UiEvent::from));
+                self.events.extend(game.on_pitch(time, heard_pitch(midi, cents, self.cents)).map(UiEvent::from));
             }
         }
 
         if clock.playing {
             let (w, window) = (self.cfg.game.hit_window, self.cfg.chord_window);
             let a4 = self.cfg.a4 * 2f32.powf(self.cents as f32 / 1200.0);
+            // Strums are heard `lag` late (latency compensation): a chord at `time` is strummed
+            // around `time + lag` on the clock of the attacks and of the guitar's audio.
+            let lag = self.cfg.game.input_offset;
             for (index, time, pitches) in game.chords_ready(now, window) {
+                let at = time + lag;
                 let attack = self
                     .attacks
                     .iter()
                     .copied()
-                    .filter(|a| (a - time).abs() <= w)
-                    .min_by(|x, y| (x - time).abs().total_cmp(&(y - time).abs()));
+                    .filter(|a| (a - at).abs() <= w)
+                    .min_by(|x, y| (x - at).abs().total_cmp(&(y - at).abs()));
                 let mut verify = |t: f64| {
                     strum_audio(monitor, &clock, &self.history, &mut self.scratch, t + offset, window, sr)
                         .is_some_and(|audio| self.verifier.verify(audio, &pitches, a4).accepted)
@@ -501,9 +505,9 @@ impl<B: AudioBackend> Session<B> {
                 // window, the chord anywhere in it (the tracker may not have noticed the strum).
                 let verdict = match attack {
                     Some(a) if now >= a + window + TAP_DELAY && verify(a) => Some((true, Some(a))),
-                    _ if now >= time + w + window + TAP_DELAY => {
+                    _ if now >= at + w + window + TAP_DELAY => {
                         let steps = (2.0 * w / SCAN_STEP).round() as usize;
-                        let found = (0..=steps).map(|k| time - w + k as f64 * SCAN_STEP).find(|&t| verify(t));
+                        let found = (0..=steps).map(|k| at - w + k as f64 * SCAN_STEP).find(|&t| verify(t));
                         Some((found.is_some(), attack.or(found)))
                     }
                     _ => None,
@@ -591,11 +595,8 @@ fn strum_audio<'a>(
     history.read(first.round() as u64, scratch).then_some(&scratch[..])
 }
 
-/// The chart note a heard one stands for, the guitar tuned `song_cents` sharp like the
-/// recording: `midi` + `cents` is the pitch heard.
-fn retuned(midi: i32, cents: f32, song_cents: f64) -> i32 {
-    if song_cents == 0.0 {
-        return midi;
-    }
-    (midi as f64 + (cents as f64 - song_cents) / 100.0).round() as i32
+/// The pitch heard (fractional MIDI) on the chart's scale: the recording's own tuning taken off
+/// (the player tuned to it).
+fn heard_pitch(midi: i32, cents: f32, song_cents: f64) -> f64 {
+    midi as f64 + (cents as f64 - song_cents) / 100.0
 }

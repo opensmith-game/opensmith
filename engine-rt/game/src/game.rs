@@ -6,6 +6,11 @@
 //! judged by the chord verifier, which the engine runs on the audio of the chords listed by
 //! `chords_ready`.
 //!
+//! A note is judged to the nearest semitone once the player's own tuning drift, learnt from the
+//! notes hit, is taken off, and an octave off counts (pickups and trackers slip by one). Dead
+//! notes, muted strums and pinch harmonics have no pitch to check: their attack is judged alone.
+//! A natural harmonic is judged at the pitch it sounds.
+//!
 //! A miss says why, from what the guitar played around the note: nothing, the right note too
 //! early or too late, another note (too high, too low), or a strum the verifier did not hear as
 //! the chord. A note played late enough to come after its miss explains it then (`Late`).
@@ -17,7 +22,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::chart::Chart;
+use crate::chart::{Chart, Note};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GameConfig {
@@ -79,6 +84,9 @@ pub struct Expected {
     pub checked: bool,
     /// Missed notes: why (what the chords' verifier found, before the miss).
     pub reason: Option<MissReason>,
+    /// Judged on its attack alone, whatever the pitch: a dead note, a muted strum, a pinch
+    /// harmonic.
+    pub attack_only: bool,
 }
 
 /// Why a note or chord was missed, from what the guitar played around it.
@@ -154,6 +162,10 @@ pub struct Game {
     stray: VecDeque<(f64, i32)>,
     /// Strums lately (pitch or not), for the misses of chords.
     strums: VecDeque<f64>,
+    /// How far the player's guitar sounds off the chart's pitches (semitones, within
+    /// ±`MAX_DRIFT`), learnt from the notes hit: a guitar a little out of tune, or going out of
+    /// tune, is still judged right.
+    drift: f64,
 }
 
 /// Extra time after a chord's hit window for its verification to come back.
@@ -164,6 +176,29 @@ const NOTE_GRACE: f64 = 0.06;
 /// The right note this far from a missed one (and outside its window) was played too early or
 /// too late.
 const TIMING_SPAN: f64 = 0.35;
+/// The tuning drift learnt from the notes hit stays within this many semitones.
+const MAX_DRIFT: f64 = 0.45;
+
+/// The pitch a note sounds as written: a natural harmonic sounds the partial of its node; a
+/// dead note, a pinch harmonic or a harmonic off the usual nodes has no pitch to judge (`None`).
+fn sounding(chart: &Chart, n: &Note) -> Option<i32> {
+    let t = n.techniques.clone().unwrap_or_default();
+    if t.mute == Some(true) || t.pinch_harmonic == Some(true) {
+        return None;
+    }
+    let open = chart.pitch(n.string, 0);
+    if t.harmonic == Some(true) {
+        return match n.fret {
+            12 => Some(open + 12),
+            7 | 19 => Some(open + 19),
+            5 | 24 => Some(open + 24),
+            4 | 9 | 16 => Some(open + 28),
+            3 => Some(open + 31),
+            _ => None,
+        };
+    }
+    Some(chart.pitch(n.string, n.fret))
+}
 
 impl Game {
     pub fn new(chart: Chart, cfg: GameConfig) -> Game {
@@ -180,6 +215,7 @@ impl Game {
             range: (f64::NEG_INFINITY, f64::INFINITY),
             stray: VecDeque::new(),
             strums: VecDeque::new(),
+            drift: 0.0,
         }
     }
 
@@ -276,7 +312,8 @@ impl Game {
             let mut new: Vec<Expected> = Vec::new();
             for (event, n) in self.chart.notes.iter().enumerate() {
                 if shown(n.levels, n.time) {
-                    let midi = self.chart.pitch(n.string, n.fret);
+                    let heard = sounding(&self.chart, n);
+                    let midi = heard.unwrap_or_else(|| self.chart.pitch(n.string, n.fret));
                     new.push(Expected {
                         event,
                         time: n.time,
@@ -286,6 +323,7 @@ impl Game {
                         status: Status::Pending,
                         checked: false,
                         reason: None,
+                        attack_only: heard.is_none(),
                     });
                 }
             }
@@ -300,6 +338,7 @@ impl Game {
                         status: Status::Pending,
                         checked: false,
                         reason: None,
+                        attack_only: c.techniques.as_ref().and_then(|t| t.mute) == Some(true),
                     });
                 }
             }
@@ -326,19 +365,35 @@ impl Game {
 
     /// The tracker heard a note: attack at `time` (song seconds), pitch `midi`.
     pub fn on_note(&mut self, time: f64, midi: i32) -> Option<Judgement> {
+        self.on_pitch(time, midi as f64)
+    }
+
+    /// The tracker heard a note: attack at `time` (song seconds), `pitch` in fractional MIDI
+    /// with the recording's own tuning already taken off.
+    pub fn on_pitch(&mut self, time: f64, pitch: f64) -> Option<Judgement> {
         let t = time - self.cfg.input_offset;
         self.activate(t);
         let w = self.cfg.hit_window;
+        let midi = (pitch - self.drift).round() as i32;
+        // The note itself first, else the same note an octave off; the nearest in time.
         let best = self
             .expected
             .iter()
             .enumerate()
-            .filter(|(_, e)| e.status == Status::Pending && (e.time - t).abs() <= w)
-            .filter(|(_, e)| matches!(e.target, Target::Note { midi: m, .. } if m == midi))
-            .min_by(|a, b| (a.1.time - t).abs().total_cmp(&(b.1.time - t).abs()))
-            .map(|(i, e)| (i, t - e.time));
-        if let Some((index, error)) = best {
-            return Some(self.hit(index, error));
+            .filter(|(_, e)| e.status == Status::Pending && !e.attack_only && (e.time - t).abs() <= w)
+            .filter_map(|(i, e)| match e.target {
+                Target::Note { midi: m, .. } if m == midi => Some((i, e.time, false)),
+                Target::Note { midi: m, .. } if (m - midi).abs() == 12 => Some((i, e.time, true)),
+                _ => None,
+            })
+            .min_by(|a, b| a.2.cmp(&b.2).then((a.1 - t).abs().total_cmp(&(b.1 - t).abs())));
+        if let Some((index, at, _)) = best {
+            let off = pitch - midi as f64;
+            self.drift = (self.drift + 0.2 * (off - self.drift)).clamp(-MAX_DRIFT, MAX_DRIFT);
+            return Some(self.hit(index, t - at));
+        }
+        if let Some(index) = self.attack_only_at(t) {
+            return Some(self.hit(index, t - self.expected[index].time));
         }
         self.strums.push_back(t);
         let in_chord = self.expected.iter().any(|e| {
@@ -349,27 +404,42 @@ impl Game {
         }
         self.score.extras += 1;
         self.stray.push_back((t, midi));
-        self.late(t, |target| matches!(target, Target::Note { midi: m, .. } if *m == midi))
+        self.late(t, |e| !e.attack_only && matches!(e.target, Target::Note { midi: m, .. } if m == midi))
     }
 
-    /// The tracker heard an attack at `time` (song seconds), with or without a pitch: chords
-    /// strummed out of time say so.
+    /// The tracker heard an attack at `time` (song seconds), with or without a pitch: it plays
+    /// a dead note or a muted strum, and chords strummed out of time say so.
     pub fn on_strum(&mut self, time: f64) -> Option<Judgement> {
         let t = time - self.cfg.input_offset;
+        self.activate(t);
         self.strums.push_back(t);
+        if let Some(index) = self.attack_only_at(t) {
+            return Some(self.hit(index, t - self.expected[index].time));
+        }
         if self.claimed(t, None) {
             return None;
         }
-        self.late(t, |target| matches!(target, Target::Chord { .. }))
+        self.late(t, |e| e.attack_only || matches!(e.target, Target::Chord { .. }))
     }
 
-    /// A missed item of the kind `fits` takes, not explained by its timing yet, whose window
-    /// ended less than `TIMING_SPAN` before `t`: it was played late.
-    fn late(&mut self, t: f64, fits: impl Fn(&Target) -> bool) -> Option<Judgement> {
+    /// The pending item judged on its attack alone nearest to an attack at `t`, in its window.
+    fn attack_only_at(&self, t: f64) -> Option<usize> {
+        let w = self.cfg.hit_window;
+        self.expected
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.status == Status::Pending && e.attack_only && (e.time - t).abs() <= w)
+            .min_by(|a, b| (a.1.time - t).abs().total_cmp(&(b.1.time - t).abs()))
+            .map(|(i, _)| i)
+    }
+
+    /// A missed item `fits` takes, not explained by its timing yet, whose window ended less
+    /// than `TIMING_SPAN` before `t`: it was played late.
+    fn late(&mut self, t: f64, fits: impl Fn(&Expected) -> bool) -> Option<Judgement> {
         let w = self.cfg.hit_window;
         let index = self.expected.iter().rposition(|e| {
             e.status == Status::Missed
-                && fits(&e.target)
+                && fits(e)
                 && t - e.time > w
                 && t - e.time <= TIMING_SPAN
                 && !matches!(e.reason, Some(MissReason::Timing { .. }))
@@ -393,6 +463,14 @@ impl Game {
         let nearest = |times: &mut dyn Iterator<Item = f64>, span: f64| {
             times.filter(|&a| (a - e.time).abs() <= span).min_by(|x, y| (x - e.time).abs().total_cmp(&(y - e.time).abs()))
         };
+        if e.attack_only {
+            // Any attack in its window would have played it: one outside it was out of time.
+            let strum = nearest(&mut self.strums.iter().copied().filter(|&a| !self.claimed(a, Some(index))), TIMING_SPAN);
+            return match strum {
+                Some(a) if (a - e.time).abs() > w => MissReason::Timing { error: a - e.time },
+                _ => MissReason::Unplayed,
+            };
+        }
         match &e.target {
             Target::Note { midi, .. } => {
                 let right = nearest(&mut self.stray.iter().filter(|s| s.1 == *midi).map(|s| s.0), TIMING_SPAN);
@@ -441,7 +519,7 @@ impl Game {
         self.expected
             .iter()
             .enumerate()
-            .filter(|(_, e)| e.status == Status::Pending && !e.checked && e.time + analysis <= t)
+            .filter(|(_, e)| e.status == Status::Pending && !e.checked && !e.attack_only && e.time + analysis <= t)
             .filter_map(|(i, e)| match &e.target {
                 Target::Chord { midis, .. } => Some((i, e.time, midis.clone())),
                 Target::Note { .. } => None,

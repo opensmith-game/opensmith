@@ -9,7 +9,7 @@ use std::sync::Arc;
 use opensmith_audio::{Bridge, EngineConfig, InputSide, Monitor, OutputSide, Track};
 use opensmith_dsp::synth::{mix_into, Pcg32, Pluck};
 use opensmith_game::{Chart, Game, GameConfig, Target};
-use opensmith_session::{AudioBackend, CalibrationPlan, RiffLoop, Session, SessionConfig, UiEvent, UiScore};
+use opensmith_session::{AudioBackend, CalibrationPlan, RiffLoop, Session, SessionConfig, UiEvent, UiScore, UiTarget};
 
 const SR: f64 = 48_000.0;
 const BLOCK: usize = 64;
@@ -390,6 +390,32 @@ fn the_calibrated_offset_centres_a_late_player() {
     let mean = o.hits.iter().map(|h| h.0).sum::<f64>() / o.hits.len() as f64;
     assert!(mean.abs() < 0.005, "mean error {mean} after compensating {late}");
     assert!(o.hits.iter().filter(|h| h.1).count() as f64 > 0.8 * o.hits.len() as f64, "perfect again once compensated");
+}
+
+#[test]
+fn chords_too_are_judged_through_a_large_latency_compensation() {
+    // A Bluetooth headset: everything is heard and played 150 ms late, compensated.
+    let chart = chart();
+    let lag = 0.15;
+    let mut rig = Rig::new(performance(&chart, lag));
+    rig.session.set_input_offset(lag);
+    rig.session.load(chart.clone(), Some(silent_track(chart.meta.duration)), -COUNT_IN);
+    rig.session.play();
+    rig.run(heard_at(chart.meta.duration) + 1.0);
+    let chords: HashSet<usize> = rig
+        .events
+        .iter()
+        .flat_map(|e| match e {
+            UiEvent::Expected { items, .. } => items.iter().filter(|i| matches!(i.target, UiTarget::Chord { .. })).map(|i| i.index).collect(),
+            _ => Vec::new(),
+        })
+        .collect();
+    let hit: HashSet<usize> = rig.events.iter().filter_map(|e| if let UiEvent::Hit { index, .. } = e { Some(*index) } else { None }).collect();
+    assert!(chords.len() >= 4, "{} chords", chords.len());
+    let chords_hit = chords.iter().filter(|i| hit.contains(i)).count();
+    assert!(chords_hit as f64 >= 0.9 * chords.len() as f64, "{chords_hit} of {} chords", chords.len());
+    let o = outcome(&rig.events);
+    assert!(o.hits.len() as f64 >= 0.95 * o.expected as f64, "{} of {}", o.hits.len(), o.expected);
 }
 
 #[test]
