@@ -6,6 +6,7 @@
 //! the song where the player *heard* it, whatever the latencies of the two devices.
 
 mod calibration;
+pub mod composer;
 mod events;
 pub mod guitarist;
 mod history;

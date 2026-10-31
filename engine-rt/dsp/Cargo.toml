@@ -10,6 +10,8 @@ license.workspace = true
 realfft.workspace = true
 hound.workspace = true
 thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 realfft.workspace = true

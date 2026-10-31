@@ -133,17 +133,17 @@ fn a_chord_strummed_out_of_time() {
     });
     assert!((timing(misses[1].1) - 0.15).abs() < 1e-9, "{misses:?}");
 
-    // A strum after the miss was called: late, said then.
+    // A strum 300 ms late, before the chord's check is over: the miss says late.
     let mut strummed = false;
-    let (_, late) = run(|g, now| {
+    let (misses, late) = run(|g, now| {
         if !strummed && now >= 5.3 {
             strummed = true;
             return g.on_strum(5.3).into_iter().collect();
         }
         vec![]
     });
-    assert_eq!(late.len(), 1);
-    assert_eq!(late[0].0, 2);
+    assert!((timing(misses[2].1) - 0.3).abs() < 1e-9, "{misses:?}");
+    assert!(late.is_empty());
 }
 
 #[test]

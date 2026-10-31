@@ -80,7 +80,8 @@ pub struct Expected {
     /// Phrase iteration (index in `Chart::phrases`).
     pub iteration: usize,
     pub status: Status,
-    /// Chords only: the verifier already looked at this strum.
+    /// The chord verifier, or the note detector for a note the tracker did not hear, already
+    /// looked at it.
     pub checked: bool,
     /// Missed notes: why (what the chords' verifier found, before the miss).
     pub reason: Option<MissReason>,
@@ -171,11 +172,13 @@ pub struct Game {
     forced: Option<Vec<Option<u32>>>,
 }
 
-/// Extra time after a chord's hit window for its verification to come back.
-const CHORD_GRACE: f64 = 0.16;
-/// Extra time after a note's hit window for the tracker to confirm its pitch: a note attacked
-/// late in the window is reported a few tens of milliseconds later (its attack time is judged).
-const NOTE_GRACE: f64 = 0.06;
+/// Extra time after a chord's hit window for its verification to come back: the strum's
+/// spread, then the 160 ms of audio the note detector looks at.
+const CHORD_GRACE: f64 = 0.25;
+/// Extra time after a note's hit window for it to be confirmed: by the tracker a few tens of ms
+/// after its attack (its attack time is judged), or by the note detector, which needs 120 ms of
+/// audio after it.
+const NOTE_GRACE: f64 = 0.18;
 /// The right note this far from a missed one (and outside its window) was played too early or
 /// too late.
 const TIMING_SPAN: f64 = 0.35;
@@ -541,6 +544,38 @@ impl Game {
                 Target::Note { .. } => None,
             })
             .collect()
+    }
+
+    /// Pending single notes, not heard by the tracker, whose time is at least `analysis` seconds
+    /// old and not checked yet: (index, time, MIDI). Check the audio and report with
+    /// `on_note_heard`.
+    pub fn notes_ready(&mut self, now: f64, analysis: f64) -> Vec<(usize, f64, i32)> {
+        let t = now - self.cfg.input_offset;
+        self.activate(t);
+        self.expected
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.status == Status::Pending && !e.checked && !e.attack_only && e.time + analysis <= t)
+            .filter_map(|(i, e)| match e.target {
+                Target::Note { midi, .. } => Some((i, e.time, midi)),
+                Target::Chord { .. } => None,
+            })
+            .collect()
+    }
+
+    /// What the note detector made of expected note `index` the tracker did not hear: `heard`
+    /// in the audio of the attack at `attack` (song time as heard), if there was one.
+    pub fn on_note_heard(&mut self, index: usize, heard: bool, attack: Option<f64>) -> Option<Judgement> {
+        let e = self.expected.get_mut(index)?;
+        if e.status != Status::Pending || !matches!(e.target, Target::Note { .. }) {
+            return None;
+        }
+        e.checked = true;
+        let error = attack.map(|a| a - self.cfg.input_offset - e.time)?;
+        if !heard || error.abs() > self.cfg.hit_window + 1e-9 {
+            return None;
+        }
+        Some(self.hit(index, error))
     }
 
     /// Result of the chord verifier for expected chord `index`; `attack` is the strum time

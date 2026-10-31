@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use opensmith_audio::{Monitor, PlayerClock, PlayerCommand, StreamInfo, Track, MAX_RATE, MIN_RATE};
+use opensmith_dsp::notefeat::{NoteFeatures, BINS, HOP, PER_SEMITONE, WINDOW};
+use opensmith_dsp::notenet::NoteNet;
 use opensmith_dsp::{ChainParams, ChordConfig, ChordVerifier, TrackerEvent, TunerAnalyzer, TunerConfig};
 use opensmith_game::{Chart, Game, GameConfig, Score};
 
@@ -27,6 +29,10 @@ const STRUM: f64 = 0.05;
 /// A strum the tracker did not notice still makes the guitar this much louder (dB): over the
 /// 40 ms from it against the 45 ms before.
 const STRUM_RISE_DB: f32 = 2.0;
+/// A note or chord the detector says was attacked with at least this probability counts.
+const HEARD: f32 = 0.5;
+/// A note the chart does not ask for, heard this surely in a chord's strum, makes it wrong.
+const WRONG: f32 = 0.85;
 /// Takes shorter than this are not kept (s).
 const MIN_TAKE: f64 = 10.0;
 
@@ -111,6 +117,75 @@ pub struct Session<B: AudioBackend> {
     record_to: Option<PathBuf>,
     recording: Option<Recording>,
     saving: Vec<JoinHandle<()>>,
+    /// The learned note detector: which notes a strum or a pick attacked.
+    listener: Option<Listener>,
+    /// Chords already checked at their attack (by index): not checked again until the end of
+    /// their window.
+    tried: std::collections::HashSet<usize>,
+}
+
+/// The learned note detector (`opensmith_dsp::notenet`) and its working buffers.
+struct Listener {
+    net: NoteNet,
+    feats: NoteFeatures,
+    audio: Vec<f32>,
+    window: Vec<f32>,
+}
+
+impl Listener {
+    /// The detector the engine ships with.
+    fn builtin() -> Option<Listener> {
+        let net = NoteNet::from_bytes(include_bytes!("../../dsp/assets/notenet.bin")).ok()?;
+        let window = vec![0.0; net.frames() * BINS];
+        Some(Listener { net, feats: NoteFeatures::new(), audio: Vec::new(), window })
+    }
+
+    /// Seconds of audio it needs after an attack.
+    fn after(&self) -> f64 {
+        (self.net.after * HOP + WINDOW / 2) as f64 / 48_000.0
+    }
+
+    /// How likely each note was attacked at track time `t`: (lowest MIDI note, probabilities).
+    /// The song plays at `rate` (the detector's frames are real time) and the guitar is tuned
+    /// `cents` off A440 like the recording (brought back to A440 for the detector).
+    #[allow(clippy::too_many_arguments)]
+    fn attacked(&mut self, monitor: &Monitor, clock: &PlayerClock, history: &TapHistory, t: f64, rate: f64, cents: f64, sr: f64) -> Option<(i32, Vec<f32>)> {
+        let half = WINDOW / 2;
+        let span = 2 * half + (self.net.frames() - 1) * HOP;
+        let from = t - rate * (self.net.before * HOP + half) as f64 / sr;
+        strum_audio(monitor, clock, history, &mut self.audio, from, span as f64 / sr, sr)?;
+        // Bins the guitar's pitches sit above A440's (fractional), read back onto A440's.
+        let shift = (cents * PER_SEMITONE as f64 / 100.0) as f32;
+        let mut tuned = [0.0f32; BINS];
+        for (f, row) in self.window.chunks_mut(BINS).enumerate() {
+            self.feats.frame(&self.audio, half + f * HOP, row);
+            if shift != 0.0 {
+                for (b, t) in tuned.iter_mut().enumerate() {
+                    let at = b as f32 + shift;
+                    let (k, frac) = (at.floor(), at - at.floor());
+                    let get = |i: f32| if i >= 0.0 && (i as usize) < BINS { row[i as usize] } else { 0.0 };
+                    *t = get(k) * (1.0 - frac) + get(k + 1.0) * frac;
+                }
+                row.copy_from_slice(&tuned);
+            }
+        }
+        Some((self.net.first, self.net.attacked(&self.window)))
+    }
+}
+
+/// Where the detector looks at a strum, from its start: a strum takes up to 60 ms across the
+/// strings, the detector counts what was attacked within 35 ms of where it looks.
+const STRUM_LOOKS: [f64; 3] = [-0.01, 0.015, 0.04];
+
+/// Whether the detector's `probs` (from MIDI `first`) say the chord `pitches` was strummed:
+/// three quarters of its notes heard, and no note foreign to it (not in its pitch classes) heard
+/// surely.
+fn strummed(first: i32, probs: &[f32], pitches: &[i32]) -> bool {
+    let p = |m: i32| probs.get((m - first) as usize).copied().unwrap_or(0.0);
+    let heard = pitches.iter().filter(|&&m| p(m) >= HEARD).count();
+    let classes: Vec<i32> = pitches.iter().map(|m| m.rem_euclid(12)).collect();
+    let foreign = (0..probs.len() as i32).map(|k| k + first).any(|m| !classes.contains(&m.rem_euclid(12)) && p(m) >= WRONG);
+    4 * heard >= 3 * pitches.len() && !foreign
 }
 
 #[derive(Clone, Copy, Default)]
@@ -158,6 +233,8 @@ impl<B: AudioBackend> Session<B> {
             record_to: None,
             recording: None,
             saving: Vec::new(),
+            listener: Listener::builtin(),
+            tried: std::collections::HashSet::new(),
         }
     }
 
@@ -602,11 +679,13 @@ impl<B: AudioBackend> Session<B> {
 
         if clock.playing {
             let (w, window) = (self.cfg.game.hit_window, self.cfg.chord_window);
+            // Audio needed after a strum: the chord window, or what the note detector looks at.
+            let listen = self.listener.as_ref().map_or(window, Listener::after);
             let a4 = self.cfg.a4 * 2f32.powf(self.cents as f32 / 1200.0);
             // Strums are heard `lag` late (latency compensation): a chord at `time` is strummed
             // around `time + lag` on the clock of the attacks and of the guitar's audio.
             let lag = self.cfg.game.input_offset * self.rate;
-            for (index, time, pitches) in game.chords_ready(now, window) {
+            for (index, time, pitches) in game.chords_ready(now, listen) {
                 let at = time + lag;
                 let attack = self
                     .attacks
@@ -614,9 +693,25 @@ impl<B: AudioBackend> Session<B> {
                     .copied()
                     .filter(|a| (a - at).abs() <= w)
                     .min_by(|x, y| (x - at).abs().total_cmp(&(y - at).abs()));
-                let mut verify = |t: f64| {
-                    strum_audio(monitor, &clock, &self.history, &mut self.scratch, t + offset, window, sr)
-                        .is_some_and(|audio| self.verifier.verify(audio, &pitches, a4).accepted)
+                let listener = &mut self.listener;
+                let learned = listener.is_some();
+                let (rate, cents) = (self.rate, self.cents);
+                let mut verify = |t: f64| match listener.as_mut() {
+                    // The detector looks around the attack itself.
+                    Some(l) => {
+                        // Each note at the best of the looks along the strum.
+                        let mut best: Option<(i32, Vec<f32>)> = None;
+                        for d in STRUM_LOOKS {
+                            let Some((first, probs)) = l.attacked(monitor, &clock, &self.history, t - STRUM / 2.0 + d + offset, rate, cents, sr) else { return false };
+                            match best.as_mut() {
+                                Some((_, b)) => b.iter_mut().zip(&probs).for_each(|(b, p)| *b = b.max(*p)),
+                                None => best = Some((first, probs)),
+                            }
+                        }
+                        best.is_some_and(|(first, probs)| strummed(first, &probs, &pitches))
+                    }
+                    None => strum_audio(monitor, &clock, &self.history, &mut self.scratch, t + offset, window, sr)
+                        .is_some_and(|audio| self.verifier.verify(audio, &pitches, a4).accepted),
                 };
                 // The strum's own audio as soon as it is in; failing that, at the end of the
                 // window, the chord where the guitar got louder in it (the tracker may not have
@@ -632,7 +727,7 @@ impl<B: AudioBackend> Session<B> {
                         .max_by(|x, y| x.1.total_cmp(&y.1))
                 };
                 let mut verdict = None;
-                if let Some(a) = attack.filter(|&a| now >= a + STRUM + window + TAP_DELAY) {
+                if let Some(a) = attack.filter(|&a| now >= a + STRUM + listen + TAP_DELAY && self.tried.insert(index)) {
                     // The strum takes a few tens of ms across the strings: checked as it ends
                     // too, and then dated where the guitar got louder the most (the attack seen
                     // may be a note just before the chord).
@@ -641,12 +736,37 @@ impl<B: AudioBackend> Session<B> {
                         verdict = Some((true, Some(start)));
                     }
                 }
-                if verdict.is_none() && now >= at + w + STRUM + window + TAP_DELAY {
-                    let found = steepest(at - w, at + w).map(|(t, _)| t).filter(|&t| verify(t + STRUM / 2.0));
+                if verdict.is_none() && now >= at + w + STRUM + listen + TAP_DELAY {
+                    // Where it got louder; with the detector, at the chord's time too (it only
+                    // answers for what was attacked right there).
+                    let found = steepest(at - w, at + w)
+                        .map(|(t, _)| t)
+                        .filter(|&t| verify(t + STRUM / 2.0))
+                        .or_else(|| learned.then_some(at).filter(|&t| verify(t + STRUM / 2.0)));
                     verdict = Some((found.is_some(), found.or(attack)));
                 }
                 if let Some((accepted, at)) = verdict {
                     self.events.extend(game.on_chord(index, accepted, at).map(UiEvent::from));
+                }
+            }
+            // Notes the tracker did not hear (another string ringing over them, a soft
+            // hammer-on): the detector, at the attack nearest to them.
+            if let Some(listener) = self.listener.as_mut() {
+                for (index, time, midi) in game.notes_ready(now, w + listen + TAP_DELAY) {
+                    // At the end of its window: each attack seen in it, nearest first, and the
+                    // note's own time when none was seen near it.
+                    let at = time + lag;
+                    let mut candidates: Vec<f64> = self.attacks.iter().copied().filter(|a| (a - at).abs() <= w).collect();
+                    candidates.sort_by(|x, y| (x - at).abs().total_cmp(&(y - at).abs()));
+                    if candidates.first().is_none_or(|a| (a - at).abs() > 0.03) {
+                        candidates.push(at);
+                    }
+                    let heard = candidates.into_iter().find(|&a| {
+                        listener
+                            .attacked(monitor, &clock, &self.history, a + offset, self.rate, self.cents, sr)
+                            .is_some_and(|(first, probs)| probs.get((midi - first) as usize).is_some_and(|&p| p >= HEARD))
+                    });
+                    self.events.extend(game.on_note_heard(index, heard.is_some(), heard).map(UiEvent::from));
                 }
             }
         }
@@ -681,6 +801,7 @@ impl<B: AudioBackend> Session<B> {
     }
 
     fn restart_view(&mut self, t: f64) {
+        self.tried.clear();
         self.target = t;
         self.sent = 0;
         self.attacks.clear();

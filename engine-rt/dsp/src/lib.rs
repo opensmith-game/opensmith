@@ -10,6 +10,8 @@ pub mod fretboard;
 pub mod fx;
 pub mod guitar;
 pub mod note;
+pub mod notefeat;
+pub mod notenet;
 pub mod onset;
 pub mod pitch;
 pub mod synth;

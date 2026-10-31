@@ -17,6 +17,14 @@ environment).
 
 The MPL-2.0 crates are used unmodified; their source is on [crates.io](https://crates.io).
 
+The note detector's weights (`engine-rt/dsp/assets/notenet.bin`) were trained on pieces
+OpenSmith composes and plays on single notes recorded in **Guitar-TECHS** (Hegel Pedroza,
+Wallace Abreu, Ryan M. Corey and Iran R. Roman, "Guitar-TECHS: An Electric Guitar Dataset
+Covering Techniques, Musical Excerpts, Chords and Scales Using a Diverse Array of Hardware",
+2025, [guitar-techs.github.io](https://guitar-techs.github.io)), licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The recordings themselves are not
+shipped.
+
 ## Installed on the player's Mac on the first import
 
 The song converter (`pipeline-ingest`) is not bundled with its dependencies: on the first

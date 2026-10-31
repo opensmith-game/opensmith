@@ -91,10 +91,20 @@ pub struct Performance {
     /// (is a chord, index in the chart's notes or chords, what was played), for each item the
     /// game expects.
     pub truth: Vec<(bool, usize, Played)>,
+    /// Every note the guitar sounded, in time order, its times from the start of the take.
+    pub voices: Vec<Voice>,
 }
 
 /// Seconds of guitar before the first note.
 const LEAD: f64 = 2.0;
+/// Open strings of the guitars the recorded notes come from (E standard).
+const RECORDED_OPEN: [i32; 6] = [40, 45, 50, 55, 59, 64];
+
+/// The fret of a recorded (E standard) guitar that sounds `midi` on `string`, if it has one.
+fn recorded_fret(string: usize, midi: i32) -> Option<i32> {
+    let fret = midi - RECORDED_OPEN.get(string)?;
+    (0..=22).contains(&fret).then_some(fret)
+}
 
 /// `player` plays `chart` with every phrase at `level` (capped at the chart's top level).
 pub fn perform(chart: &Chart, level: u32, player: &Player, seed: u64) -> Performance {
@@ -186,7 +196,12 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                 } else {
                     Kind::Plain
                 };
-                let recorded = Some((fret, kind, rng.next_u32()));
+                // A harmonic is recorded by its node, on a string tuned as the recorded ones.
+                let recorded = if harmonic {
+                    (open.round() as i32 == RECORDED_OPEN[s]).then(|| (fret, kind, rng.next_u32()))
+                } else {
+                    recorded_fret(s, open.round() as i32 + fret).map(|f| (f, kind, rng.next_u32()))
+                };
                 let ring = tech.palm_mute != Some(true) && (fret == 0 || harmonic || chance(&mut rng, player.let_ring));
                 let end = if tech.palm_mute == Some(true) {
                     at + 0.12 + n.sustain
@@ -249,7 +264,7 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                     let excitation =
                         if tech.mute == Some(true) { Excitation::Dead { level: level * 0.7 } } else { Excitation::Pick { level: level * 0.8, pos: rng.range(0.1, 0.25) } };
                     let kind = if tech.palm_mute == Some(true) { Kind::PalmMute } else { Kind::Plain };
-                    let recorded = Some((fret, kind, rng.next_u32()));
+                    let recorded = recorded_fret(s, open.round() as i32 + fret).map(|f| (f, kind, rng.next_u32()));
                     let voice =
                         Voice { string: s, start, end, midi: open + fret as f64, glide: Vec::new(), vibrato: 0.0, excitation, palm: tech.palm_mute == Some(true), recorded };
                     voices.push((voice, !ring));
@@ -279,5 +294,5 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
         levels,
         score: TakeScore::default(),
     };
-    Performance { take, truth }
+    Performance { take, truth, voices }
 }
