@@ -131,6 +131,7 @@
           </label>
           <label class="wide"><input type="checkbox" name="invertStrings" /> Cordes inversées : Mi grave en bas, comme une tablature</label>
           <label class="wide"><input type="checkbox" name="masterMode" /> Mode Maître : les notes des phrases maîtrisées s’effacent avant d’arriver, à jouer de mémoire</label>
+          <label class="wide live-only"><input type="checkbox" name="autoLatency" /> Ajuster la latence tout seul : en fin de morceau, si toutes tes notes arrivent décalées d’à peu près autant</label>
           <label class="wide live-only"><input type="checkbox" name="recordTakes" /> Enregistrer ma guitare pendant les morceaux, pour régler la détection des notes (les prises restent sur ce Mac)</label>
           <label class="live-only" title="Les morceaux à quelques demi-tons de cet accordage sont décalés pour lui : pas besoin de réaccorder.">Ma guitare reste accordée en
             <select name="guitarTuning"></select>
@@ -253,6 +254,7 @@
               <dt><kbd>Espace</kbd></dt><dd>Pause, reprendre</dd>
               <dt><kbd>R</kbd></dt><dd>Recommencer</dd>
               <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Reculer, avancer de 5 s</dd>
+              <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Plus vite, moins vite (25 à 150 % ; au ralenti, la partie ne compte pas dans les records)</dd>
               <dt><kbd>L</kbd></dt><dd>Loop Trainer</dd>
               <dt><kbd>I</kbd></dt><dd>Inverser les cordes</dd>
               <dt><kbd>Échap</kbd></dt><dd>Pause, puis retour aux morceaux</dd>

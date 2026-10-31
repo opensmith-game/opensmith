@@ -459,6 +459,27 @@ fn chords_too_are_judged_through_a_large_latency_compensation() {
 }
 
 #[test]
+fn slowed_down_the_latency_compensation_stays_in_real_time() {
+    // At half speed, a player 60 ms late (the audio chain's latency, compensated) is on time:
+    // 60 ms of real time is only 30 ms of song time.
+    let chart = chart();
+    let (rate, late) = (0.5, 0.06);
+    let heard = |t: f64| OUT_LATENCY + (t + COUNT_IN) / rate;
+    let mut guitar = vec![0.0f32; input_index(heard(8.0) + 1.0)];
+    play_into(&mut guitar, &chart, |t| t < 8.0, |t| heard(t) + late);
+    let mut rig = Rig::new(guitar);
+    rig.session.set_input_offset(late);
+    rig.session.load(chart.clone(), Some(silent_track(chart.meta.duration)), -COUNT_IN);
+    rig.session.set_rate(rate);
+    rig.session.play();
+    rig.run(heard(8.0));
+    let o = outcome(&rig.events);
+    assert!(o.hits.len() > 10 && o.hits.len() as f64 >= 0.9 * (o.hits.len() + o.misses) as f64, "{} hits, {} misses", o.hits.len(), o.misses);
+    let mean = o.hits.iter().map(|h| h.0).sum::<f64>() / o.hits.len() as f64;
+    assert!(mean.abs() < 0.006, "mean error {mean} at half speed");
+}
+
+#[test]
 fn loop_trainer_loops_a_phrase_slowed_down_and_judges_every_pass() {
     let chart = chart();
     let mut rig = Rig::new(Vec::new());

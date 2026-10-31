@@ -364,6 +364,7 @@ impl<B: AudioBackend> Session<B> {
     /// Latency compensation (s), from the calibration; applies to the song being played too.
     pub fn set_input_offset(&mut self, seconds: f64) {
         self.cfg.game.input_offset = seconds;
+        let seconds = seconds * self.rate;
         if let Some(game) = &mut self.game {
             game.set_input_offset(seconds);
         }
@@ -413,6 +414,11 @@ impl<B: AudioBackend> Session<B> {
     pub fn set_rate(&mut self, rate: f64) {
         self.rate = rate.clamp(MIN_RATE, MAX_RATE);
         self.backend.monitor().send(PlayerCommand::Rate(self.rate));
+        // The latency is real time: slowed down, it is that much less song time.
+        let lag = self.cfg.game.input_offset * self.rate;
+        if let Some(game) = &mut self.game {
+            game.set_input_offset(lag);
+        }
     }
 
     pub fn rate(&self) -> f64 {
@@ -593,7 +599,7 @@ impl<B: AudioBackend> Session<B> {
             let a4 = self.cfg.a4 * 2f32.powf(self.cents as f32 / 1200.0);
             // Strums are heard `lag` late (latency compensation): a chord at `time` is strummed
             // around `time + lag` on the clock of the attacks and of the guitar's audio.
-            let lag = self.cfg.game.input_offset;
+            let lag = self.cfg.game.input_offset * self.rate;
             for (index, time, pitches) in game.chords_ready(now, window) {
                 let at = time + lag;
                 let attack = self

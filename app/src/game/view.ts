@@ -34,6 +34,8 @@ export interface Toast {
   kind: 'up' | 'down' | 'mastered' | 'perfect' | 'phrase' | 'streak' | 'lost';
   title: string;
   detail?: string;
+  /** A toast with the same key replaces the one on screen (a setting being changed). */
+  key?: string;
 }
 
 export interface PhraseResult {

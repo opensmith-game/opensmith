@@ -36,7 +36,7 @@ const TEMPLATE = `
 <div class="toasts" data-el="toasts"></div>
 <div class="countdown" data-el="countdown"></div>
 <div class="heard" data-el="heard"></div>
-<footer class="hint" data-el="hint">${t('Espace pause · R recommencer · ← → ±5 s · L Loop Trainer · I inverser les cordes · ? raccourcis')}</footer>`;
+<footer class="hint" data-el="hint">${t('Espace pause · R recommencer · ← → ±5 s · ↑ ↓ vitesse · L Loop Trainer · ? raccourcis')}</footer>`;
 
 /** Loop Trainer state shown over the highway. */
 export interface RiffInfo {
@@ -184,8 +184,10 @@ export class Hud {
   }
 
   toast(t: Toast): void {
+    if (t.key) this.el.toasts.querySelector(`[data-key="${CSS.escape(t.key)}"]`)?.remove();
     const div = document.createElement('div');
     div.className = `toast ${t.kind}`;
+    if (t.key) div.dataset.key = t.key;
     const title = document.createElement('b');
     title.textContent = t.title;
     div.append(title);

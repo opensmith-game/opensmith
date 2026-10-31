@@ -177,7 +177,6 @@ export const MAIN: Record<string, string> = {
   // The HUD over the highway
   'notes d\'affilée': 'in a row',
   'Public': 'Crowd',
-  'Espace pause · R recommencer · ← → ±5 s · L Loop Trainer · I inverser les cordes · ? raccourcis': 'Space pause · R restart · ← → ±5 s · L Loop Trainer · I flip strings · ? shortcuts',
   'Vitesse {speed} · Passe {n}': 'Speed {speed} · Pass {n}',
   'MAÎTRE': 'MASTER',
 
@@ -247,6 +246,14 @@ export const MAIN: Record<string, string> = {
   'Trop bas': 'Too low',
   'Mauvais accord': 'Wrong chord',
   'Prise enregistrée': 'Take saved',
+  'Vitesse {pct}': 'Speed {pct}',
+  'Entraînement : pas compté dans tes records': 'Practice: not counted in your records',
+  'Annuler l’ajustement': 'Undo',
+  'Latence ajustée de {shift} ms (compensation à {offset} ms) : tes notes arrivaient toutes décalées d’à peu près autant.': 'Latency adjusted by {shift} ms (compensation at {offset} ms): your notes all landed off by about as much.',
+  'Compensation remise à {offset} ms.': 'Compensation back to {offset} ms.',
+  'Ajuster la latence tout seul : en fin de morceau, si toutes tes notes arrivent décalées d’à peu près autant': 'Adjust the latency by itself: at the end of a song, when your notes all land off by about as much',
+  'Plus vite, moins vite (25 à 150 % ; au ralenti, la partie ne compte pas dans les records)': 'Faster, slower (25 to 150 %; slowed down, the play does not count in your records)',
+  'Espace pause · R recommencer · ← → ±5 s · ↑ ↓ vitesse · L Loop Trainer · ? raccourcis': 'Space pause · R restart · ← → ±5 s · ↑ ↓ speed · L Loop Trainer · ? shortcuts',
   'Joué en {tuning}': 'Played in {tuning}',
   'Morceau décalé de {shift} demi-ton': 'Song shifted {shift} semitone',
   'Morceau décalé de {shift} demi-tons': 'Song shifted {shift} semitones',

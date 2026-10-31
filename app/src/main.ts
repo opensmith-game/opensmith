@@ -95,6 +95,8 @@ interface Settings extends GuitarValues {
   recordTakes: boolean;
   /** The tuning the guitar stays in, songs transposed to it ('': retuned for each song). */
   guitarTuning: string;
+  /** A steady lag at the end of a song is compensated without asking. */
+  autoLatency: boolean;
   /** The place behind the highway outside the career (whose gigs bring their own). */
   scenery: SceneryId;
   /** The guitar's sound, in free play and in songs. */
@@ -113,6 +115,7 @@ const DEFAULTS: Settings = {
   masterMode: true,
   recordTakes: false,
   guitarTuning: '',
+  autoLatency: true,
   scenery: 'concert',
   amp: DEFAULT_AMP,
   autopilot: false,
@@ -157,6 +160,8 @@ let levelsForced = false;
 let challengeRun: Challenge | null = null;
 /** The song being recorded in the studio (a take for the album). */
 let studioRun: string | null = null;
+/** Playback speed of the song (outside the Loop Trainer): slowed down, a play is practice. */
+let playSpeed = 1;
 const screens = {
   menu: $('menu'),
   library: $('library'),
@@ -731,7 +736,21 @@ function exitRiff(): void {
   riff = null;
   engine.setRiff(null);
   engine.setSpeed(1);
+  playSpeed = 1;
   showRiff();
+}
+
+/** Playback speed of the song, 25 to 150 %, the pitch unchanged (not on stage nor in Score
+ * Attack). */
+function setPlaySpeed(speed: number): void {
+  playSpeed = Math.round(Math.min(1.5, Math.max(0.25, speed)) * 20) / 20;
+  engine.setSpeed(playSpeed);
+  hud.toast({
+    kind: playSpeed < 1 ? 'down' : 'up',
+    key: 'speed',
+    title: t('Vitesse {pct}', { pct: percent(playSpeed) }),
+    detail: playSpeed < 1 ? t('Entraînement : pas compté dans tes records') : undefined,
+  });
 }
 
 function setRiffSpeed(speed: number): void {
@@ -964,6 +983,7 @@ async function start(id: string, riffOpening = false): Promise<void> {
   riffFirst = riffOpening;
   currentId = id;
   riff = null;
+  playSpeed = 1; // a load plays at full speed
   showRiff();
   attack = attackNext ? new AttackRun(attackLevel(attackNext)) : null;
   attackNext = null;
@@ -1483,8 +1503,33 @@ function showTiming(v: GameView): void {
     n.unplayed && tn(n.unplayed, '{n} pas jouée', '{n} pas jouées'),
   ].filter(Boolean);
   if (parts.length) line(t('Notes ratées : {list}', { list: parts.join(' · ') }));
-  const steady = engine instanceof TauriEngine ? steadyOffset(v.timing) : null;
+  // Slowed down or sped up, song-time errors are not the latency.
+  const steady = engine instanceof TauriEngine && playSpeed === 1 ? steadyOffset(v.timing) : null;
   if (!steady) return;
+  if (settings.autoLatency) {
+    const before = settings.inputOffsetMs;
+    settings.inputOffsetMs = Math.max(-150, Math.min(150, before + steady.medianMs));
+    syncSettings();
+    applyVolumes();
+    const p = line(
+      t('Latence ajustée de {shift} ms (compensation à {offset} ms) : tes notes arrivaient toutes décalées d’à peu près autant.', {
+        shift: `${steady.medianMs > 0 ? '+' : '−'}${Math.abs(steady.medianMs)}`,
+        offset: settings.inputOffsetMs,
+      }),
+    );
+    const undo = document.createElement('button');
+    undo.type = 'button';
+    undo.className = 'action small';
+    undo.textContent = t('Annuler l’ajustement');
+    undo.addEventListener('click', () => {
+      settings.inputOffsetMs = before;
+      syncSettings();
+      applyVolumes();
+      undo.replaceWith(t('Compensation remise à {offset} ms.', { offset: before }));
+    });
+    p.append(' ', undo);
+    return;
+  }
   const ms = Math.abs(steady.medianMs);
   const p = line(
     steady.medianMs > 0
@@ -1532,12 +1577,16 @@ function showResults(): void {
   $('verdict').textContent = verdicts[grade];
   // Into the song's progress: levels for next time, records, mastery.
   let records = '';
-  const outcome = attack ? null : recordSong(grade);
-  // A song of the repertoire played through: a rehearsal; a studio take when recording.
-  rehearseSong();
+  // Slowed down, a play is practice: no records, no rehearsal, no trophy.
+  const practice = playSpeed < 1;
+  const outcome = attack || practice ? null : recordSong(grade);
   document.querySelector('#results .challenge-result.take')?.remove();
-  if (studioRun && studioRun === currentId) settleTake(studioRun, accuracy(view.score));
-  announce($('trophyToasts'), songEarns(grade, outcome?.masteryAfter ?? (currentId ? (progress[currentId]?.mastery ?? 0) : 0)));
+  if (!practice) {
+    // A song of the repertoire played through: a rehearsal; a studio take when recording.
+    rehearseSong();
+    if (studioRun && studioRun === currentId) settleTake(studioRun, accuracy(view.score));
+    announce($('trophyToasts'), songEarns(grade, outcome?.masteryAfter ?? (currentId ? (progress[currentId]?.mastery ?? 0) : 0)));
+  }
   if (outcome) {
     const lines: Record<string, string> = {
       score: t('Nouveau record de points !'),
@@ -1620,6 +1669,7 @@ function syncSettings(): void {
   field<HTMLInputElement>('invertStrings').checked = settings.invertStrings;
   field<HTMLInputElement>('masterMode').checked = settings.masterMode;
   field<HTMLInputElement>('recordTakes').checked = settings.recordTakes;
+  field<HTMLInputElement>('autoLatency').checked = settings.autoLatency;
   field<HTMLSelectElement>('scenery').value = settings.scenery;
   field<HTMLSelectElement>('guitarTuning').value = settings.guitarTuning;
   if (!gig) highway.setScenery(settings.scenery);
@@ -1635,6 +1685,7 @@ form.addEventListener('input', (e) => {
   if (e.target === langSelect) return;
   settings.invertStrings = field<HTMLInputElement>('invertStrings').checked;
   settings.masterMode = field<HTMLInputElement>('masterMode').checked;
+  settings.autoLatency = field<HTMLInputElement>('autoLatency').checked;
   if (settings.recordTakes !== field<HTMLInputElement>('recordTakes').checked) {
     settings.recordTakes = !settings.recordTakes;
     if (engine instanceof TauriEngine) engine.setRecording(settings.recordTakes);
@@ -1727,6 +1778,9 @@ window.addEventListener('keydown', (e) => {
       if (riff && (mode === 'play' || mode === 'pause')) {
         e.preventDefault();
         setRiffSpeed(riff.choice.speed + (e.key === 'ArrowUp' ? 0.05 : -0.05));
+      } else if (!gig && !attack && (mode === 'play' || mode === 'pause')) {
+        e.preventDefault();
+        setPlaySpeed(playSpeed + (e.key === 'ArrowUp' ? 0.05 : -0.05));
       }
       break;
     case ' ':
