@@ -24,7 +24,7 @@ export function aboutSource(song: SongEntry): string {
 
 export const SOURCES: Record<SongSource, { label: string; about: string }> = {
   tab: { label: t('Tablature'), about: t('Notes d’une tablature Guitar Pro, calées sur l’enregistrement.') },
-  chart: { label: t('Chart'), about: t('Notes écrites à la main pour cet enregistrement, importées par un plugin.') },
+  chart: { label: t('Chart'), about: t('Notes écrites à la main pour cet enregistrement (feedpak ou plugin).') },
   ai: { label: t('IA'), about: t('Notes transcrites automatiquement depuis l’enregistrement : il peut y avoir des erreurs.') },
   sheet: { label: t('Tablature seule'), about: t('Une tablature sans enregistrement : on joue sans la musique.') },
 };

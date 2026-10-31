@@ -264,7 +264,8 @@ fn library_id(root: &Path, path: &Path) -> String {
     path.strip_prefix(root).unwrap_or(path).components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
 }
 
-/// Song files under `dir` (sub-folders too): audio, and what the pipeline's plugins import.
+/// Song files under `dir` (sub-folders too): audio, feedpaks, and what the pipeline's plugins
+/// import.
 fn music_files(dir: &Path, depth: usize, importer: &Importer, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for path in entries.flatten().map(|e| e.path()) {
@@ -272,11 +273,13 @@ fn music_files(dir: &Path, depth: usize, importer: &Importer, out: &mut Vec<Path
         if hidden {
             continue;
         }
-        if path.is_dir() {
+        if path.is_dir() && import::kind_of(&path).is_none() {
             if depth < 4 {
                 music_files(&path, depth + 1, importer, out);
             }
-        } else if import::kind_of(&path) == Some("audio") || (import::kind_of(&path).is_none() && importer.accepts(&path)) {
+        } else if path.is_dir() {
+            out.push(path); // a song packed as a folder (feedpak): its stems are not songs
+        } else if matches!(import::kind_of(&path), Some("audio" | "feedpak")) || (import::kind_of(&path).is_none() && importer.accepts(&path)) {
             out.push(path);
         }
     }
@@ -304,10 +307,14 @@ async fn library(app: State<'_, App>) -> Result<Vec<SongEntry>, String> {
 /// (the app makes them its music folder).
 #[tauri::command]
 fn import_paths(importer: State<'_, Importer>, paths: Vec<String>) -> Dropped {
+    dropped_paths(&importer, paths)
+}
+
+fn dropped_paths(importer: &Importer, paths: Vec<String>) -> Dropped {
     let mut dropped = Dropped { jobs: Vec::new(), folders: Vec::new(), ignored: Vec::new() };
     for p in paths {
         let path = PathBuf::from(&p);
-        if path.is_dir() {
+        if path.is_dir() && import::kind_of(&path).is_none() {
             dropped.folders.push(p);
         } else if let Some(job) = importer.add(&path) {
             eprintln!("conversion demandée : {}", path.display());
@@ -900,5 +907,26 @@ mod tests {
         fs::write(library.join("night-drive/song_chart.json"), chart("Night Drive (live)", "night-drive.mp3")).unwrap();
         assert_eq!(Index::of(&library, &charts).songs[0].title, "Night Drive (live)");
         assert_eq!(charts.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_feedpak_folder_is_one_song_not_a_folder_of_stems() {
+        let root = scratch("feedpak");
+        let (library, dir) = (root.join("library"), root.join("music"));
+        let pack = dir.join("Night Drive.feedpak");
+        fs::create_dir_all(pack.join("stems")).unwrap();
+        fs::create_dir_all(&library).unwrap();
+        for f in ["manifest.yaml", "stems/full.ogg", "stems/guitar.ogg"] {
+            fs::write(pack.join(f), b"pack").unwrap();
+        }
+        fs::write(dir.join("Crowd Surf.feedpak"), b"zip").unwrap();
+        let importer = Importer::new(library.clone(), None, |_| {});
+        importer.set_paused(true);
+
+        let queued: Vec<_> = queue_folder(&library, &Charts::default(), &importer, &dir).into_iter().map(|j| j.name).collect();
+        assert_eq!(queued, ["Crowd Surf.feedpak", "Night Drive.feedpak"]);
+        // Dropped on the window, the pack folder is a song to convert, not a music folder.
+        let dropped = dropped_paths(&importer, vec![pack.to_string_lossy().into_owned()]);
+        assert!(dropped.folders.is_empty() && dropped.jobs.len() == 1);
     }
 }

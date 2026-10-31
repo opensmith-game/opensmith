@@ -11,7 +11,9 @@ d'ampli et une carrière du garage au stade.
 - **Tes propres morceaux** : un MP3 (ou WAV, FLAC, M4A…) est séparé en pistes (Demucs), la
   guitare transcrite (Basic Pitch) et placée sur le manche (un solveur de Viterbi), avec cinq
   niveaux de difficulté. Pose une tablature Guitar Pro à côté du MP3 et OpenSmith prend ses
-  notes, calées sur l'enregistrement.
+  notes, calées sur l'enregistrement. Les morceaux écrits à la main au format
+  [feedpak](https://github.com/got-feedBack/feedpak-spec) (le format ouvert de feedBack) se jouent
+  tels quels, avec leur audio.
 - **Ta vraie guitare** : détection des notes et des accords en Rust à 48 kHz avec des buffers
   de 64 échantillons, calibrage de la latence, un accordeur et un ampli avec les canaux clair,
   crunch, lead et métal.
@@ -58,9 +60,9 @@ L'app arrive dans `app/src-tauri/target/release/bundle/`. Voir
    calibrer la latence (gratter sur 12 clics) et t'accorder.
 2. **Morceaux → First Riff** : le morceau de démo. Espace met en pause, `?` liste tous les
    raccourcis.
-3. Importe ta propre musique : glisse des MP3, une tablature Guitar Pro ou tout un dossier sur
-   la fenêtre. Compte une demi-minute par morceau sur un Mac M (le premier import installe
-   aussi le convertisseur, quelques minutes).
+3. Importe ta propre musique : glisse des MP3, une tablature Guitar Pro, un feedpak ou tout un
+   dossier sur la fenêtre. Compte une demi-minute par morceau sur un Mac M (le premier import
+   installe aussi le convertisseur, quelques minutes).
 4. Essaie la **Carrière**, le **Loop Trainer** sur un passage difficile, et **Réglages → Jeu →
    Langue** (anglais ou français).
 
@@ -82,9 +84,11 @@ sur l'enregistrement.
 **Faut-il le Real Tone Cable ?** Non. N'importe quelle interface audio marche ; choisis son
 entrée dans **Réglages → Audio & guitare**. Le câble, lui, est simplement trouvé tout seul.
 
-**D'autres formats de fichiers ?** Le convertisseur accepte des plugins : un paquet Python qui
-ajoute une commande d'import (voir [CONTRIBUTING.md](CONTRIBUTING.md)). Une fois installé,
-l'app accepte ses fichiers comme des MP3.
+**D'autres formats de fichiers ?** Les morceaux feedpak (archives `.feedpak` ou dossiers)
+s'importent tels quels : la partition telle que son auteur l'a écrite (avec ses niveaux de
+difficulté s'il y en a) et l'audio du pack. Au-delà, le convertisseur accepte des plugins : un
+paquet Python qui ajoute une commande d'import (voir [CONTRIBUTING.md](CONTRIBUTING.md)). Une
+fois installé, l'app accepte ses fichiers comme des MP3.
 
 **Windows, Linux, Mac Intel ?** Pas encore. Les portages Windows et Linux sont en cours ; le
 plus dur est une latence jouable à la guitare. Sous Windows, le mode audio partagé ajoute 25 à

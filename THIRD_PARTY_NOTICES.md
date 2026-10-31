@@ -30,6 +30,7 @@ import, `uv` downloads them from PyPI onto the player's Mac.
 | [librosa](https://librosa.org) | ISC | onsets, beat tracking |
 | NumPy, SciPy, scikit-learn, soundfile | BSD | signal processing, audio files |
 | [PyGuitarPro](https://github.com/Perlence/PyGuitarPro) | LGPL-3.0 | Guitar Pro import |
+| [PyYAML](https://pyyaml.org) | MIT | feedpak import (manifests) |
 | python-soxr, lameenc | LGPL-2.1+ / LGPL-3.0 | resampling, MP3 (via Demucs) |
 | jsonschema, mir_eval, pretty_midi, julius, einops | MIT | chart validation, transcription tooling |
 | certifi, tqdm | MPL-2.0 | downloads |

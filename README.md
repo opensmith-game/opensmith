@@ -11,7 +11,9 @@ the stadium.
 - **Any song you have**: an MP3 (or WAV, FLAC, M4A…) is split into stems (Demucs), the guitar
   transcribed (Basic Pitch) and fingered on the neck (a Viterbi solver), with five difficulty
   levels. Put a Guitar Pro tab next to the MP3 and OpenSmith uses its notes instead, synced to
-  the recording.
+  the recording. Songs charted by hand in feedBack's open
+  [feedpak](https://github.com/got-feedBack/feedpak-spec) format play as written, with their
+  audio.
 - **Your real guitar**: pitch and chord detection in Rust at 48 kHz with 64-sample buffers,
   latency calibration, a tuner, and an amp with clean, crunch, lead and metal channels.
 - **Practice**: Loop Trainer (loop a passage, slow it down without changing the pitch, speed
@@ -53,9 +55,9 @@ The app lands in `app/src-tauri/target/release/bundle/`. See
 1. Open OpenSmith. A short guide has you plug in the guitar, set the input level, calibrate the
    latency (strum on 12 clicks) and tune.
 2. **Songs → First Riff**: the demo song. Space pauses, `?` lists every shortcut.
-3. Import your own music: drop MP3s, a Guitar Pro tab or a whole folder on the window. Each
-   song takes about half a minute on an M-series Mac (the first import also installs the
-   converter, a few minutes).
+3. Import your own music: drop MP3s, a Guitar Pro tab, a feedpak or a whole folder on the
+   window. Each song takes about half a minute on an M-series Mac (the first import also
+   installs the converter, a few minutes).
 4. Try **Career**, **Loop Trainer** on a hard passage, and **Settings → Game → Language**
    (English or French).
 
@@ -74,7 +76,9 @@ notes and syncs them to the recording.
 **Do I need the Real Tone Cable?** No. Any audio interface works; pick its input in
 **Settings → Audio & guitar**. The cable is simply found on its own.
 
-**Other file formats?** The song converter takes plugins: a Python package that adds an import
+**Other file formats?** feedpak songs (`.feedpak` archives or folders) import as they are: the
+chart as its author wrote it (with its difficulty levels when it has some) and the pack's audio.
+Beyond that, the song converter takes plugins: a Python package that adds an import
 command (see [CONTRIBUTING.md](CONTRIBUTING.md)). Once installed, the app accepts its files like
 MP3s.
 

@@ -50,7 +50,7 @@ export const SCREENS: Record<string, string> = {
   'notes, accords, techniques': 'notes, chords, techniques',
   'Bibliothèque': 'Library',
   'niveaux, sections, prêt à jouer': 'levels, sections, ready to play',
-  'Glisse ici un MP3, une tablature Guitar Pro ou tout un dossier': 'Drop an MP3, a Guitar Pro tab or a whole folder here',
+  'Glisse ici un MP3, une tablature Guitar Pro, un feedpak ou tout un dossier': 'Drop an MP3, a Guitar Pro tab, a feedpak or a whole folder here',
   '… n’importe où sur la fenêtre. Un dossier part en entier dans la file d’import : les morceaux arrivent un à un dans la bibliothèque pendant que tu joues, et la file reprend où elle en était si l’app est fermée.':
     '… anywhere on the window. A folder goes into the import queue whole: songs land in the library one by one while you play, and the queue picks up where it left off if the app is closed.',
   'Choisir des fichiers…': 'Choose files…',
@@ -99,7 +99,7 @@ export const SCREENS: Record<string, string> = {
   // Library (library.ts)
   'Tablature': 'Tab',
   'Notes d’une tablature Guitar Pro, calées sur l’enregistrement.': 'Notes from a Guitar Pro tab, synced to the recording.',
-  'Notes écrites à la main pour cet enregistrement, importées par un plugin.': 'Notes written by hand for this recording, imported by a plugin.',
+  'Notes écrites à la main pour cet enregistrement (feedpak ou plugin).': 'Notes written by hand for this recording (feedpak or a plugin).',
   'IA': 'AI',
   'Notes transcrites automatiquement depuis l’enregistrement : il peut y avoir des erreurs.': 'Notes transcribed automatically from the recording: there may be mistakes.',
   'Tablature seule': 'Tab only',

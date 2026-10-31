@@ -10,7 +10,7 @@ _Dernière mise à jour : 2026-10-31 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, P
 | 4 | L'envie de rejouer : progression sauvegardée, Loop Trainer (boucle + ralenti sans changer la hauteur), mode Maître | ✅ terminée |
 | 5 | Préparation open source : formats en plugins, app autonome sur un autre Mac, anglais, CI, morceau de démo, licence GPL-3.0 | ✅ terminée |
 
-**Tests : 356 verts** — Rust 114 (moteur 101, app 13) + 3 lancés à la demande (vrai matériel, vrai pipeline) ; interface 134 (Vitest) ; Python 108 rapides + 8 de bout en bout.
+**Tests : 381 verts** — Rust 115 (moteur 101, app 14) + 3 lancés à la demande (vrai matériel, vrai pipeline) ; interface 134 (Vitest) ; Python 132 rapides + 8 de bout en bout.
 
 ---
 
@@ -31,6 +31,20 @@ _Dernière mise à jour : 2026-10-31 · Mac M1 Max, macOS 27.0.1, Rust 1.99.1, P
 - **Import sous Windows** : convertisseur (et son installation) dans son propre groupe de processus, sous la priorité du jeu, sans fenêtre de console, arrêté avec `taskkill /T` ; `uv.exe` trouvé ; le Python du convertisseur installé cherché dans `.venv\Scripts` ; bibliothèque dans le dossier Musique du système (aussi `XDG_MUSIC_DIR` sous Linux) ; icône Windows.
 - **Convertisseur** : UTF-8 explicite (Windows écrit en cp1252, un titre accentué rendait le chart illisible) ; CUDA utilisé quand il est là.
 - **Reste à faire** : latence sous Windows (cpal ne fait que du WASAPI partagé, 25 à 40 ms : il faudra le mode exclusif ou ASIO) ; sous Linux, l'hôte PipeWire de cpal, le choix du bon périphérique ALSA (le câble y apparaît plusieurs fois sous le même nom) et la 3D à 60 images/s dans la vue web.
+
+### Import feedpak : les charts écrits à la main de feedBack
+
+[feedpak](https://github.com/got-feedBack/feedpak-spec) est le format ouvert du projet feedBack (spec 1.x, CC0 + MIT) : un `manifest.yaml`, un JSON par arrangement, les stems audio. Lu sans reprendre de code de feedBack (`importers/feedpak.py`, commande `opensmith-ingest feedpak`).
+
+- **Deux formes** : dossier `*.feedpak` ou archive zip (aussi zippée avec son dossier). Tout passe par le manifeste ; un chemin qui sortirait du pack est refusé ; `.jsonc` débarrassé de ses commentaires ; une version 2.x refusée avec un message clair.
+- **Arrangement** : `--arrangement` (id ou nom), sinon lead, combo, rhythm, une autre guitare, la basse. Batterie, piano et parties en notation seule sont écartés.
+- **Accordage** : décalages du manifeste d'abord (§5.2), sur E A D G B E ou E A D G pour une basse ; 7 et 8 cordes, basse 5 et 6 cordes ; une basse notée sur 6 décalages qui n'utilise que 4 cordes est une 4 cordes ; les octaves entières de `centOffset` déplacent les cordes, le reste devient le désaccord de l'enregistrement.
+- **Difficulté** : un pack avec des niveaux par phrase les garde tels qu'écrits (plage de niveaux par note, haut de phrase prolongé jusqu'au maximum) ; les phrases au même contenu partagent un nom (difficulté dynamique, Loop Trainer). Un pack à un seul niveau reçoit les 5 niveaux générés comme pour Guitar Pro, doigté de l'auteur conservé.
+- **Techniques** : hammer-on, pull-off, slide, bend (déjà en demi-tons), vibrato, palm mute, mute, harmoniques, trémolo, accent, tap ; sens du coup de médiator pour les accords ; notes « ignorées » écartées. Un accord joué autrement que sa forme reçoit sa propre forme.
+- **Audio** : le stem `full` (le mixage complet), sinon les stems joués à l'ouverture, mixés ; WAV 48 kHz 16 bits. Pochette reprise si elle est là.
+- **Durée** : celle de l'audio, jamais avant la dernière note ; la grille de temps est prolongée au même pas. Les packs publiés par feedBack ont des `duration` fausses dans les deux sens (l'hymne américain : 50,5 s annoncées, 78,3 s d'audio et des notes jusqu'à 69 s ; Für Elise : 185,8 s annoncées pour 128,3 s d'audio).
+- **App** : `.feedpak` est un format intégré (pas un plugin : reconnu avant même l'installation du convertisseur), glissé sur la fenêtre ou trouvé dans un dossier de musique ; un dossier `*.feedpak` est un morceau, pas un dossier de stems. Badge « Chart » dans la bibliothèque.
+- Vérifié sur les deux exemples de la spec (guitare, basse, accord, pochette, audio) et sur deux packs de démo de feedBack (The Star-Spangled Banner, 101 notes ; Für Elise en version guitare, 674 notes et 101 accords) : durée = audio, aucune note hors d'une phrase, 5 niveaux. Tests : `tests/test_feedpak.py` (24), `import.rs` et `lib.rs` (format reconnu, dossier pack = un morceau).
 
 ---
 

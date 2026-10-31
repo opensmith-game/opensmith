@@ -89,6 +89,13 @@ def _parser() -> argparse.ArgumentParser:
     gp.add_argument("--track", type=int, help="track index (default: first guitar track)")
     gp.add_argument("--progress-json", action="store_true", help=machine)
 
+    pak = sub.add_parser("feedpak", help="feedpak (folder or .feedpak archive) → chart + song audio (notes already in time)")
+    pak.add_argument("file", type=Path)
+    pak.add_argument("-o", "--out", type=Path)
+    pak.add_argument("--arrangement", help="its id or name (default: lead, else combo, rhythm, another guitar part, bass)")
+    pak.add_argument("--list", action="store_true", help="list the arrangements, and exit")
+    pak.add_argument("--progress-json", action="store_true", help=machine)
+
     again = sub.add_parser("rechart", help="rebuild imported songs' charts from their stems (current charting rules)")
     again.add_argument("folders", type=Path, nargs="+")
     again.add_argument("--no-consensus", action="store_true", help="keep each repeat of a phrase as transcribed")
@@ -196,6 +203,17 @@ def _run(args: argparse.Namespace, emit: Emit | None) -> None:
         out.mkdir(parents=True, exist_ok=True)
         chart.save(out / "song_chart.json")
         imported(emit, chart, out / "song_chart.json")
+    elif args.cmd == "feedpak":
+        from .importers.feedpak import Pack, ingest_feedpak
+
+        if args.list:
+            for a in Pack(args.file).arrangements():
+                print(f"{a.get('id')}: {a.get('name', a.get('id'))}")
+            return
+        out = args.out or Path("out") / args.file.name.removesuffix(".feedpak")
+        sink = (lambda stage, f: emit(stage=stage, fraction=round(f, 4))) if emit else None
+        chart = ingest_feedpak(args.file, out, arrangement=args.arrangement, progress=sink)
+        imported(emit, chart, out / "song_chart.json", tuning=chart.tuning.name, arrangement=chart.arrangement_name)
     elif args.cmd == "retab":
         from .pipeline import retab
 

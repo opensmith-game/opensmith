@@ -151,7 +151,7 @@ export interface PipelineStep {
 const AUDIO = /\.(mp3|wav|flac|ogg|m4a|aiff?)$/i;
 const TAB = /\.(gp[345x]?)$/i;
 /** Files the converter takes without plugins (the dialog adds the plugins' own). */
-const BUILT_IN = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aiff', 'gp', 'gp3', 'gp4', 'gp5', 'gpx'];
+const BUILT_IN = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aiff', 'gp', 'gp3', 'gp4', 'gp5', 'gpx', 'feedpak'];
 
 /** The MP3 pipeline's steps over its overall progress (pipeline-ingest progress.py weights:
  * decode + separate + stems, transcribe + beats, chart). */
@@ -209,7 +209,7 @@ const NEXT_SHOWN = 4;
 
 const TEMPLATE = `
 <div class="import-drop">
-  <b>${t('Glisse ici un MP3, une tablature Guitar Pro ou tout un dossier')}</b>
+  <b>${t('Glisse ici un MP3, une tablature Guitar Pro, un feedpak ou tout un dossier')}</b>
   <span>${t('… n’importe où sur la fenêtre. Un dossier part en entier dans la file d’import : les morceaux arrivent un à un dans la bibliothèque pendant que tu joues, et la file reprend où elle en était si l’app est fermée.')}</span>
   <span class="drop-actions">
     <button class="action primary" data-action="pick-files">${t('Choisir des fichiers…')}</button>

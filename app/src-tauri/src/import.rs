@@ -24,9 +24,10 @@ use serde::{Deserialize, Serialize};
 
 /// Files the pipeline turns into songs (anything ffmpeg decodes, in practice).
 pub const AUDIO: &[&str] = &["mp3", "wav", "flac", "m4a", "aac", "ogg", "aif", "aiff"];
-/// Tabs imported without audio: Guitar Pro 3–5. Plugins of the pipeline add other formats
+/// Tabs imported without audio (Guitar Pro 3–5) and feedpak songs (chart and audio; a
+/// `.feedpak` folder counts as one file). Plugins of the pipeline add other formats
 /// (`Importer::learn_formats`).
-const TABS: &[(&str, &str)] = &[("gp3", "guitarpro"), ("gp4", "guitarpro"), ("gp5", "guitarpro")];
+const TABS: &[(&str, &str)] = &[("gp3", "guitarpro"), ("gp4", "guitarpro"), ("gp5", "guitarpro"), ("feedpak", "feedpak")];
 /// Written next to an imported chart: the file it came from.
 pub const ORIGIN: &str = "import.json";
 /// Written by the pipeline next to a chart made from a tab placed on the recording.
@@ -1092,6 +1093,7 @@ echo '{"done": true, "title": "2 morceaux", "songs": 2}'"#,
     fn each_kind_of_file_goes_to_its_pipeline_command() {
         assert_eq!(kind_of(Path::new("a/Song.MP3")), Some("audio"));
         assert_eq!(kind_of(Path::new("a/tab.gp4")), Some("guitarpro"));
+        assert_eq!(kind_of(Path::new("a/Night Drive.feedpak")), Some("feedpak"));
         assert_eq!(kind_of(Path::new("a/notes.txt")), None);
     }
 

@@ -13,7 +13,7 @@ export const MAIN: Record<string, string> = {
   'Morceaux': 'Songs',
   'Chargement…': 'Loading…',
   'Importer un morceau': 'Import a song',
-  'MP3, Guitar Pro · ou glisse-les sur la fenêtre': 'MP3, Guitar Pro · or drop them on the window',
+  'MP3, Guitar Pro, feedpak · ou glisse-les sur la fenêtre': 'MP3, Guitar Pro, feedpak · or drop them on the window',
   'Loop Trainer': 'Loop Trainer',
   'Un passage en boucle, au ralenti': 'A passage on loop, slowed down',
   'Jouer librement': 'Free play',
@@ -101,7 +101,7 @@ export const MAIN: Record<string, string> = {
   'Fermer': 'Close',
   'Chargement': 'Loading',
   'Lâche pour convertir': 'Drop to convert',
-  'MP3, WAV, FLAC, Guitar Pro… ou tout un dossier de musique': 'MP3, WAV, FLAC, Guitar Pro… or a whole music folder',
+  'MP3, WAV, FLAC, Guitar Pro, feedpak… ou tout un dossier de musique': 'MP3, WAV, FLAC, Guitar Pro, feedpak… or a whole music folder',
 
   // main.ts
   'Modifier le riff': 'Edit the riff',
