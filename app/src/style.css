@@ -3214,6 +3214,11 @@ body:not(.live) .live-only {
   margin-top: 4px;
 }
 
+.lessons-record-head {
+  margin: 22px 0 4px;
+  font-size: 15px;
+}
+
 .lesson-tempo {
   margin: 0 0 10px;
   color: var(--muted);

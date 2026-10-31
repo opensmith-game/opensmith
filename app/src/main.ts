@@ -970,7 +970,7 @@ function updateMenu(): void {
   $('menuTrophies').textContent = won
     ? t('{won} sur {total}', { won, total: TROPHIES.length })
     : t('{won} sur {total} : sur scène et sur les morceaux', { won, total: TROPHIES.length });
-  const all = lessons();
+  const all = lessons().filter((l) => !l.record);
   const done = all.filter((l) => passed(l, lessonRecords)).length;
   $('menuLessons').textContent = done
     ? done === all.length
@@ -1002,6 +1002,7 @@ function celebrate(trophies: Trophy[]): void {
 function showMenu(): void {
   if (gig) finishGig('abandoned');
   sfx.room(null);
+  if (lessonRun !== null) recordFor(false);
   lessonRun = null;
   challengeRun = null;
   studioRun = null;
@@ -1027,6 +1028,7 @@ function openImports(): void {
 
 async function start(id: string, riffOpening = false): Promise<void> {
   lessonRun = null;
+  recordFor(false);
   current = findSong(songs, id) ?? null;
   riffFirst = riffOpening;
   currentId = id;
@@ -1203,6 +1205,7 @@ async function startLesson(index: number): Promise<void> {
   const lesson = lessons()[index];
   if (!lesson) return;
   lessonRun = index;
+  recordFor(lesson.record ?? false);
   current = null;
   currentId = null;
   riffFirst = false;
@@ -1232,11 +1235,26 @@ async function startLesson(index: number): Promise<void> {
   else restart();
 }
 
+/** Recording sessions record the guitar whatever the settings say; elsewhere, the settings. */
+function recordFor(session: boolean): void {
+  if (engine instanceof TauriEngine) engine.setRecording(settings.recordTakes || session);
+}
+
 /** End of a lesson: passed or not, its best kept, and the way to the next one. */
 function lessonVerdict(acc: number, judged: boolean, practice: boolean): void {
   const list = lessons();
   const index = lessonRun!;
   const lesson = list[index];
+  if (lesson.record) {
+    $('verdict').textContent = t('Enregistrement terminé');
+    $('records').textContent =
+      engine.kind === 'live'
+        ? t('Merci ! Ta guitare est enregistrée sur ce Mac (dossier Musique → OpenSmith → .takes).')
+        : t('En mode démo, rien n’est enregistré : il faut l’app et ta guitare.');
+    $('records').classList.toggle('new', engine.kind === 'live');
+    screens.results.querySelector<HTMLElement>('[data-action="next-lesson"]')!.hidden = true;
+    return;
+  }
   if (judged && !practice && !autopiloting()) lessonRecords = recordLesson(lessonRecords, lesson.id, acc);
   const ok = judged && !practice && acc >= lesson.goal;
   if (ok) {

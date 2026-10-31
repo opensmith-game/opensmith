@@ -52,19 +52,29 @@ export class LessonsScreen {
 
   private render(): void {
     const done = this.list.filter((l) => passed(l, this.records)).length;
+    const taught = this.list.filter((l) => !l.record).length;
     const next = nextLesson(this.list, this.records);
     const panel = el('div', 'panel lessons-panel');
     const head = el('header', 'screen-head');
     const back = el('button', 'action small', t('← Menu'));
     back.type = 'button';
     back.dataset.action = 'menu';
-    head.append(back, el('h2', '', t('Leçons')), el('span', 'lessons-count', t('{done} sur {total} réussies', { done, total: this.list.length })));
+    head.append(back, el('h2', '', t('Leçons')), el('span', 'lessons-count', t('{done} sur {total} réussies', { done, total: taught })));
     panel.append(
       head,
       el('p', 'help', t('Pour commencer de zéro. Chaque leçon dure moins d’une minute, sur un métronome : atteins l’objectif pour passer à la suivante.')),
     );
-    const list = el('ol', 'lesson-list');
+    let list = el('ol', 'lesson-list');
     this.list.forEach((lesson, i) => {
+      if (lesson.record && !this.list[i - 1]?.record) {
+        // The recording sessions, apart: they teach nothing, they let the game learn the guitar.
+        panel.append(list);
+        list = el('ol', 'lesson-list');
+        panel.append(
+          el('h3', 'lessons-record-head', t('Ta guitare, pour mieux t’écouter')),
+          el('p', 'help', t('Deux séances de quelques minutes, sans objectif : ta guitare est enregistrée sur ce Mac pendant que tu joues, pour régler la détection des notes sur son son.')),
+        );
+      }
       const best = this.records[lesson.id];
       const ok = passed(lesson, this.records);
       const item = el('li', `lesson${ok ? ' passed' : ''}${i === next && !ok ? ' next' : ''}${i === this.picked ? ' open' : ''}`);
@@ -73,19 +83,20 @@ export class LessonsScreen {
       top.dataset.lesson = String(i);
       const text = el('span', 'lesson-text');
       text.append(el('b', '', lesson.title), el('span', '', lesson.learn));
-      const meta =
-        best === undefined
+      const meta = lesson.record
+        ? t('{n} enregistrements · {minutes} min', { n: lesson.steps.length, minutes: Math.ceil(((lesson.steps[lesson.steps.length - 1].beat + 8) * 60) / lesson.bpm / 60) })
+        : best === undefined
           ? t('Objectif {goal}', { goal: pct(lesson.goal) })
           : t('Objectif {goal} · ton meilleur {best}', { goal: pct(lesson.goal), best: pct(best) });
       text.append(el('small', '', meta));
-      top.append(el('span', 'lesson-number', ok ? '✓' : String(i + 1)), text);
+      top.append(el('span', 'lesson-number', lesson.record ? '●' : ok ? '✓' : String(i + 1)), text);
       item.append(top);
       if (i === this.picked) {
         const how = el('div', 'lesson-how');
         how.append(el('h3', '', t('Comment faire')));
         const steps = el('ul');
         steps.append(...lesson.how.map((h) => el('li', '', h)));
-        const go = el('button', 'action primary', ok ? t('Rejouer la leçon') : t('Commencer la leçon'));
+        const go = el('button', 'action primary', lesson.record ? t('Commencer l’enregistrement') : ok ? t('Rejouer la leçon') : t('Commencer la leçon'));
         go.type = 'button';
         go.dataset.lessonStart = String(i);
         how.append(steps, el('p', 'lesson-tempo', t('Tempo : {bpm} battements par minute', { bpm: lesson.bpm })), go);

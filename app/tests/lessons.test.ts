@@ -17,9 +17,10 @@ afterEach(() => vi.unstubAllGlobals());
 describe('lessons', () => {
   it('make charts the engine plays: a bar of clicks, then the notes, in order, inside the song', () => {
     const all = lessons();
-    expect(all.length).toBe(10);
     expect(new Set(all.map((l) => l.id)).size).toBe(all.length);
-    all.forEach((lesson, i) => {
+    const taught = all.filter((l) => !l.record);
+    expect(taught.length).toBe(10);
+    taught.forEach((lesson, i) => {
       const c = lessonChart(lesson, i);
       expect(c.format).toBe('opensmith-chart');
       expect(c.meta.title).toBe(`Leçon ${i + 1} · ${lesson.title}`);
@@ -91,7 +92,8 @@ describe('lessons', () => {
     expect(JSON.parse(data.get('opensmith.lessons')!)).toEqual({ [all[0].id]: 0.9 });
     expect(loadLessons()).toEqual(records);
     const everything = Object.fromEntries(all.map((l) => [l.id, 1]));
-    expect(nextLesson(all, everything)).toBe(all.length - 1);
+    // All passed: the last lesson, not a recording session after it.
+    expect(all[nextLesson(all, everything)].id).toBe('first-riff');
   });
 
   it('ignore a damaged record, and work without storage', () => {
@@ -101,5 +103,26 @@ describe('lessons', () => {
     expect(loadLessons()).toEqual({});
     vi.unstubAllGlobals();
     expect(recordLesson({}, 'open-strings', 0.7)).toEqual({ 'open-strings': 0.7 });
+  });
+});
+
+describe('recording sessions', () => {
+  it('ask for every string at every fret up to the 12th, then nine chords four times, after the lessons', () => {
+    const all = lessons();
+    const at = (id: string) => all.findIndex((l) => l.id === id);
+    expect(at('record-notes')).toBeGreaterThan(at('first-riff'));
+    const notes = lessonChart(all[at('record-notes')], at('record-notes'));
+    expect(notes.meta.title).toBe('Ta guitare, note par note');
+    const asked = new Set(notes.notes.map((n) => `${n.string}:${n.fret}`));
+    expect(asked.size).toBe(6 * 13);
+    // Two seconds apart: each note rings on its own.
+    const times = notes.notes.map((n) => n.time);
+    expect(Math.min(...times.slice(1).map((t, k) => t - times[k]))).toBeCloseTo(2);
+    expect(notes.meta.duration).toBeLessThan(180);
+    const chords = lessonChart(all[at('record-chords')], at('record-chords'));
+    expect(chords.chords).toHaveLength(36);
+    expect(chords.chordTemplates.map((c) => c.name)).toEqual(['E', 'Em', 'A', 'Am', 'C', 'D', 'G', 'E5', 'A5']);
+    // A session is never passed, nor counted among the lessons.
+    expect(passed(all[at('record-chords')], { 'record-chords': 1 })).toBe(false);
   });
 });

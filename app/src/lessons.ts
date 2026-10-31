@@ -2,7 +2,9 @@
  * Lessons for someone who has never played: the strings, the frets, a melody, the first chords
  * and a riff. Each is a short chart played over a metronome, with what to do and a goal (the
  * share of notes to play); passing one leads to the next. What each lesson's best was is kept
- * on this Mac.
+ * on this Mac. Two recording sessions come after them: every string at every fret up to the
+ * 12th, then nine chords, the guitar recorded as it plays them (takes kept on this Mac) so that
+ * the note detection can be tuned to the player's own guitar and cable.
  */
 import type { Anchor, Chart, Chord, ChordTemplate, HandShape, Note } from './chart';
 import { t } from './i18n';
@@ -22,11 +24,18 @@ export interface Lesson {
   goal: number;
   bpm: number;
   steps: Step[];
+  /** A recording session: no goal, the guitar recorded. */
+  record?: boolean;
 }
 
 /** Chords the lessons use: fret per string from the low E (-1: not played), and the fingers
  * (1 index … 4 little finger, 0 open). */
 export const CHORDS: Record<string, { frets: number[]; fingers: number[] }> = {
+  E: { frets: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0] },
+  A: { frets: [-1, 0, 2, 2, 2, 0], fingers: [-1, 0, 1, 2, 3, 0] },
+  C: { frets: [-1, 3, 2, 0, 1, 0], fingers: [-1, 3, 2, 0, 1, 0] },
+  D: { frets: [-1, -1, 0, 2, 3, 2], fingers: [-1, -1, 0, 1, 3, 2] },
+  G: { frets: [3, 2, 0, 0, 0, 3], fingers: [2, 1, 0, 0, 0, 3] },
   E5: { frets: [0, 2, 2, -1, -1, -1], fingers: [0, 1, 2, -1, -1, -1] },
   G5: { frets: [3, 5, 5, -1, -1, -1], fingers: [1, 3, 4, -1, -1, -1] },
   A5: { frets: [-1, 0, 2, 2, -1, -1], fingers: [-1, 0, 1, 2, -1, -1] },
@@ -68,8 +77,48 @@ const MOON: Step[] = [
   [12, 3, 0, 4],
 ].map(([beat, string, fret, hold]) => ({ beat, string, fret, hold }));
 
-/** The lessons, in order, in the interface language. */
+/** Chords of the recording session, each strummed four times. */
+const RECORDED_CHORDS = ['E', 'Em', 'A', 'Am', 'C', 'D', 'G', 'E5', 'A5'];
+
+/** The lessons, in order, then the recording sessions, in the interface language. */
 export function lessons(): Lesson[] {
+  return [...teaching(), ...recordings()];
+}
+
+function recordings(): Lesson[] {
+  return [
+    {
+      id: 'record-notes',
+      record: true,
+      title: t('Ta guitare, note par note'),
+      learn: t('Chaque corde à vide, puis case après case jusqu’à la 12 : le jeu apprend comment sonne ta guitare.'),
+      how: [
+        t('Une note toutes les deux secondes, sur le clic : laisse-la sonner jusqu’à la suivante.'),
+        t('Une corde après l’autre, de la rouge à la violette. Un seul doigt suffit : suis la lumière sur le manche.'),
+        t('Une note ratée n’est pas grave : elle est simplement laissée de côté.'),
+      ],
+      goal: 0,
+      bpm: 60,
+      steps: [0, 1, 2, 3, 4, 5].flatMap((string) => Array.from({ length: 13 }, (_, fret) => ({ string, fret }))).map((n, k) => ({ ...n, beat: 2 * k, hold: 2 })),
+    },
+    {
+      id: 'record-chords',
+      record: true,
+      title: t('Ta guitare, en accords'),
+      learn: t('Neuf accords, quatre fois chacun : le jeu apprend comment sonnent tes accords.'),
+      how: [
+        t('Chaque accord est gratté quatre fois vers le bas, puis tu as deux temps pour changer.'),
+        t('Les numéros sur le manche disent où poser chaque doigt ; un accord pas tout à fait propre sert aussi.'),
+        t('Mi, Mi mineur, La, La mineur, Do, Ré, Sol, puis E5 et A5.'),
+      ],
+      goal: 0,
+      bpm: 60,
+      steps: RECORDED_CHORDS.flatMap((chord, k) => [0, 1, 2, 3].map((i) => ({ beat: 10 * k + 2 * i, chord, hold: 2 }))),
+    },
+  ];
+}
+
+function teaching(): Lesson[] {
   return [
     {
       id: 'open-strings',
@@ -268,7 +317,7 @@ export function lessonChart(lesson: Lesson, index: number): Chart {
   const last = steps.reduce((m, s) => Math.max(m, s.beat + (s.hold ?? 1)), 0);
   const beats = LEAD + Math.ceil(last / 4) * 4 + TAIL;
   const duration = beats * spb;
-  const title = t('Leçon {n} · {title}', { n: index + 1, title: lesson.title });
+  const title = lesson.record ? lesson.title : t('Leçon {n} · {title}', { n: index + 1, title: lesson.title });
   return {
     format: 'opensmith-chart',
     version: 1,
@@ -314,10 +363,11 @@ export function recordLesson(records: LessonRecords, id: string, accuracy: numbe
   return next;
 }
 
-export const passed = (lesson: Lesson, records: LessonRecords): boolean => (records[lesson.id] ?? 0) >= lesson.goal;
+export const passed = (lesson: Lesson, records: LessonRecords): boolean => !lesson.record && (records[lesson.id] ?? 0) >= lesson.goal;
 
-/** The first lesson not passed yet (the last one once all are). */
+/** The first lesson not passed yet (the last one once all are); recording sessions aside. */
 export function nextLesson(list: readonly Lesson[], records: LessonRecords): number {
-  const i = list.findIndex((l) => !passed(l, records));
-  return i < 0 ? list.length - 1 : i;
+  const i = list.findIndex((l) => !l.record && !passed(l, records));
+  if (i >= 0) return i;
+  return list.reduce((last, l, k) => (l.record ? last : k), 0);
 }

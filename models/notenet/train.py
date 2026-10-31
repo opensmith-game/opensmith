@@ -1,13 +1,18 @@
 """The learned note detector: around an attack (40 ms before, 120 ms after), which notes were
 just attacked, MIDI 28 to 95. Trained on pieces the composer invents, played by the virtual
-guitarist on notes recorded from real guitars (`opensmith-dataset`), tested on real playing.
+guitarist on notes recorded from real guitars (`opensmith-dataset`), and on real playing: the
+real takes whose names start with `--learn-from` (players, e.g. P1,P3) are a share of every
+batch, the others are the test.
 
 Features come from `opensmith_dsp::notefeat` (the game's own code): 216 bins, three per semitone
 from MIDI 26, a frame every 10 ms. The network is small enough to run in the game, in Rust
 (`opensmith_dsp::notenet` reads the weights this script exports).
 
-uv run --project pipeline-ingest python models/notenet/train.py <data folder> <weights out> [steps] [channels]
+uv run --project pipeline-ingest python models/notenet/train.py <data folder> <weights out> [steps]
+    [--channels 16] [--learn-from P1,P2,P3] [--measure weights.bin]
 """
+
+import argparse
 
 import json
 import struct
@@ -23,6 +28,7 @@ BINS, PER_SEMITONE, LOW_MIDI = 216, 3, 26
 BEFORE, AFTER = 4, 12  # frames around the attack
 FIRST, PITCHES = 28, 68  # MIDI 28 to 95
 NEAR = 0.035  # a note started within this of the attack counts as attacked there (s)
+REAL_SHARE = 0.3  # of each batch, from the real takes learned from
 HARMONICS = (0.5, 1, 2, 3, 4, 5)
 SHIFTS = [round(36 * np.log2(h)) for h in HARMONICS]
 
@@ -30,9 +36,11 @@ SHIFTS = [round(36 * np.log2(h)) for h in HARMONICS]
 class Pieces:
     """Every piece of a folder: features (memory-mapped) and the notes attacked."""
 
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, keep=lambda stem: True):
         self.items = []
         for meta in sorted(folder.glob("*.json")):
+            if not keep(meta.stem):
+                continue
             doc = json.loads(meta.read_text())
             feats = np.memmap(meta.with_suffix(".f32"), dtype="<f4", mode="r").reshape(-1, BINS)
             notes = [(n["start"], int(round(n["pitch"])), n["kind"]) for n in doc["notes"]]
@@ -142,6 +150,21 @@ def export(model, path: Path):
             f.write(t.tobytes())
 
 
+def load(path: Path) -> NoteNet:
+    """A network from weights `export` wrote."""
+    raw = path.read_bytes()
+    size = struct.unpack("<I", raw[:4])[0]
+    header = json.loads(raw[4 : 4 + size])
+    model = NoteNet(header["tensors"][0][1][0])
+    at, state = 4 + size, {}
+    for name, shape in header["tensors"]:
+        count = int(np.prod(shape))
+        state[name] = torch.from_numpy(np.frombuffer(raw, dtype="<f4", count=count, offset=at).reshape(shape).copy())
+        at += 4 * count
+    model.load_state_dict(state)
+    return model
+
+
 def check(model, data: Pieces, path: Path, device):
     """A few windows and what the network says of them, for the Rust side to compare: count,
     then each window's features and its probabilities, little-endian f32."""
@@ -163,19 +186,32 @@ def check(model, data: Pieces, path: Path, device):
             f.write(y.astype("<f4").tobytes())
 
 
-def main(folder: Path, out: Path, steps: int, channels: int = 16):
+def main(folder: Path, out: Path, steps: int, channels: int = 16, learn_from: str = "", measure: Path | None = None):
     device = "mps" if torch.backends.mps.is_available() else "cpu"
-    train, val, real = Pieces(folder / "train"), Pieces(folder / "val"), Pieces(folder / "real")
-    print(f"{len(train.items)} pieces to train on, {len(val.items)} to check, {len(real.items)} real takes ({device})", flush=True)
+    players = tuple(p for p in learn_from.split(",") if p)
+    train, val = Pieces(folder / "train"), Pieces(folder / "val")
+    learned = Pieces(folder / "real", keep=lambda stem: bool(players) and stem.startswith(players))
+    real = Pieces(folder / "real", keep=lambda stem: not (players and stem.startswith(players)))
+    print(f"{len(train.items)} pieces and {len(learned.items)} real takes to learn from, {len(val.items)} pieces and {len(real.items)} real takes to check ({device})", flush=True)
+    if measure is not None:
+        model = load(measure).to(device)
+        f_val, _ = evaluate(model, val, device)
+        f_real, n_real = evaluate(model, real, device)
+        print(f"{measure.name}: val F1 {100 * f_val:.1f} real F1 {100 * f_real:.1f} ({n_real} attacks)")
+        return
     model = NoteNet(channels).to(device)
     print(sum(p.numel() for p in model.parameters()), "parameters", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=3e-3, total_steps=steps)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(4.0, device=device))
     rng = np.random.default_rng(1)
+    mixed = round(256 * REAL_SHARE) if learned.items else 0
     best, t0 = -1.0, time.time()
     for step in range(1, steps + 1):
-        x, y = train.batch(rng, 256)
+        x, y = train.batch(rng, 256 - mixed)
+        if mixed:
+            xr, yr = learned.batch(rng, mixed)
+            x, y = torch.cat([x, xr]), torch.cat([y, yr])
         loss = loss_fn(model(x.to(device)), y.to(device))
         opt.zero_grad()
         loss.backward()
@@ -185,7 +221,9 @@ def main(folder: Path, out: Path, steps: int, channels: int = 16):
             f_val, _ = evaluate(model, val, device)
             f_real, n_real = evaluate(model, real, device)
             print(f"step {step} loss {loss.item():.4f} val F1 {100 * f_val:.1f} real F1 {100 * f_real:.1f} ({n_real} attacks) {time.time() - t0:.0f} s", flush=True)
-            if f_val > best:
+            # Learning from real playing, the invented pieces no longer tell which step is best:
+            # the last one (the learning rate down to nothing) is kept.
+            if f_val > best or (mixed and step == steps):
                 best = f_val
                 export(model, out)
                 check(model, val, out.with_suffix(".check"), device)
@@ -193,4 +231,12 @@ def main(folder: Path, out: Path, steps: int, channels: int = 16):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else 20000, int(sys.argv[4]) if len(sys.argv) > 4 else 16)
+    args = argparse.ArgumentParser(description="Trains the note detector and exports its weights.")
+    args.add_argument("data", type=Path)
+    args.add_argument("out", type=Path)
+    args.add_argument("steps", type=int, nargs="?", default=20000)
+    args.add_argument("--channels", type=int, default=16)
+    args.add_argument("--learn-from", default="", help="real takes to learn from: name prefixes (players), comma-separated")
+    args.add_argument("--measure", type=Path, help="only measure these weights")
+    a = args.parse_args()
+    main(a.data, a.out, a.steps, a.channels, a.learn_from, a.measure)

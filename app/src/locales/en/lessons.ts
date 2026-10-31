@@ -114,4 +114,27 @@ export const LESSONS: Record<string, string> = {
     'G5: index on fret 3 of the red string, ring and little fingers on fret 5 of the yellow and blue strings. Same shape as E5, with one more finger.',
   'A5 : corde jaune à vide, index et majeur case 2 sur la bleue et l’orange.': 'A5: yellow string open, index and middle fingers on fret 2 of the blue and orange strings.',
   'Le riff passe quatre fois : regarde où va la main avant le changement.': 'The riff comes four times: look where the hand goes before each change.',
+
+  // Recording sessions
+  'Ta guitare, pour mieux t’écouter': 'Your guitar, so the game hears it better',
+  'Deux séances de quelques minutes, sans objectif : ta guitare est enregistrée sur ce Mac pendant que tu joues, pour régler la détection des notes sur son son.':
+    'Two sessions of a few minutes, with no goal: your guitar is recorded on this Mac as you play, to tune the note detection to its sound.',
+  '{n} enregistrements · {minutes} min': '{n} recordings · {minutes} min',
+  'Commencer l’enregistrement': 'Start recording',
+  'Enregistrement terminé': 'Recording done',
+  'Merci ! Ta guitare est enregistrée sur ce Mac (dossier Musique → OpenSmith → .takes).': 'Thanks! Your guitar is recorded on this Mac (Music → OpenSmith → .takes folder).',
+  'En mode démo, rien n’est enregistré : il faut l’app et ta guitare.': 'Nothing is recorded in demo mode: it takes the app and your guitar.',
+  'Ta guitare, note par note': 'Your guitar, note by note',
+  'Chaque corde à vide, puis case après case jusqu’à la 12 : le jeu apprend comment sonne ta guitare.':
+    'Each open string, then fret after fret up to the 12th: the game learns how your guitar sounds.',
+  'Une note toutes les deux secondes, sur le clic : laisse-la sonner jusqu’à la suivante.': 'One note every two seconds, on the click: let it ring until the next one.',
+  'Une corde après l’autre, de la rouge à la violette. Un seul doigt suffit : suis la lumière sur le manche.':
+    'One string after the other, from red to purple. One finger is enough: follow the light on the neck.',
+  'Une note ratée n’est pas grave : elle est simplement laissée de côté.': 'A missed note does not matter: it is simply left out.',
+  'Ta guitare, en accords': 'Your guitar, in chords',
+  'Neuf accords, quatre fois chacun : le jeu apprend comment sonnent tes accords.': 'Nine chords, four times each: the game learns how your chords sound.',
+  'Chaque accord est gratté quatre fois vers le bas, puis tu as deux temps pour changer.': 'Each chord is strummed down four times, then you have two beats to change.',
+  'Les numéros sur le manche disent où poser chaque doigt ; un accord pas tout à fait propre sert aussi.':
+    'The numbers on the neck say where each finger goes; a chord that is not quite clean helps too.',
+  'Mi, Mi mineur, La, La mineur, Do, Ré, Sol, puis E5 et A5.': 'E, E minor, A, A minor, C, D, G, then E5 and A5.',
 };
