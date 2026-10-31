@@ -110,3 +110,23 @@ fn an_octave_off_counts_but_the_note_itself_comes_first() {
     let mut g = game_every(0.08, &[g2, g3], &[]);
     assert!(matches!(g.on_note(1.03, 55), Some(Judgement::Hit { index: 1, .. })));
 }
+
+#[test]
+fn a_strum_may_brush_the_open_strings_next_to_its_chord() {
+    let json = r#"{"format":"opensmith-chart","version":1,
+        "meta":{"title":"T","artist":"A","album":null,"year":null,"duration":4.0,"source":{"kind":"audio","file":"x"},"generator":"test"},
+        "audio":{"backing":null,"guitar":null,"mix":null,"offset":0.0},
+        "arrangement":{"name":"Lead","type":"lead","tuning":{"name":"E Standard","strings":[40,45,50,55,59,64]},"capo":0,"maxDifficulty":0},
+        "tempo":{"bpm":120.0,"timeSignature":[4,4]},"beats":[{"time":0.0,"bar":1}],"sections":[],
+        "phrases":[{"name":"A","start":0.0,"end":4.0,"maxDifficulty":0}],
+        "chordTemplates":[
+          {"name":"A5","frets":[-1,0,2,2,-1,-1],"fingers":[-1,0,1,2,-1,-1]},
+          {"name":"E","frets":[0,2,2,1,0,0],"fingers":[0,2,3,1,0,0]},
+          {"name":"D","frets":[-1,-1,0,2,3,2],"fingers":[-1,-1,0,1,3,2]}],
+        "notes":[],"chords":[],"anchors":[],"handShapes":[]}"#;
+    let chart = opensmith_game::Chart::from_json(json).unwrap();
+    // The low E below, the B above; nothing outside a six-string chord; only the A next to D's.
+    assert_eq!(chart.brushable(0), vec![40, 59]);
+    assert!(chart.brushable(1).is_empty());
+    assert_eq!(chart.brushable(2), vec![45]);
+}

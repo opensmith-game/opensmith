@@ -243,6 +243,21 @@ impl Chart {
     }
 
     /// Pitches of a chord template, low string first.
+    /// Open strings a strum of chord `template` may brush on its way (MIDI): the string just
+    /// below its lowest and just above its highest, when the chord leaves them unplayed.
+    pub fn brushable(&self, template: usize) -> Vec<i32> {
+        let frets = &self.chord_templates[template].frets;
+        let strings = &self.arrangement.tuning.strings;
+        let played: Vec<usize> = frets.iter().enumerate().filter(|(_, f)| **f >= 0).map(|(s, _)| s).collect();
+        let (Some(&lo), Some(&hi)) = (played.first(), played.last()) else { return Vec::new() };
+        [lo.checked_sub(1), Some(hi + 1)]
+            .into_iter()
+            .flatten()
+            .filter(|&s| s < strings.len() && frets.get(s).is_none_or(|f| *f < 0))
+            .map(|s| strings[s])
+            .collect()
+    }
+
     pub fn chord_pitches(&self, template: usize) -> Vec<i32> {
         self.chord_templates[template]
             .frets

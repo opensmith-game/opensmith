@@ -60,6 +60,9 @@ pub struct Voice {
     pub palm: bool,
     /// The recording to play instead, given recorded notes: (fret, how it is played, which one).
     pub recorded: Option<(i32, Kind, u32)>,
+    /// Fret buzz, 0..1: the string, pressed too lightly or too far from the fret, rattles
+    /// against it for the first moments.
+    pub buzz: f32,
 }
 
 /// The instrument and its cable.
@@ -113,6 +116,9 @@ pub fn render_with(voices: &[Voice], seconds: f64, sound: &GuitarSound, seed: u6
             (None, Excitation::Dead { level }) => dead(v, level, sound, &mut out, &mut rng),
             (None, _) => ring(v, sound, &mut out, &mut rng),
         }
+        if v.buzz > 0.0 {
+            rattle(v, sound, &mut out, &mut rng);
+        }
     }
     let loudest = out.iter().fold(0.0f32, |m, x| m.max(x.abs()));
     let scale = if loudest > 0.0 { sound.peak / loudest } else { 1.0 };
@@ -123,6 +129,30 @@ pub fn render_with(voices: &[Voice], seconds: f64, sound: &GuitarSound, seed: u6
         *x = *x * scale + sound.peak * (sound.hum * 0.8 * hum as f32 + sound.hiss * rng.gauss());
     }
     out
+}
+
+/// Fret buzz: bursts of bright noise once per vibration (the string slapping the fret), dying
+/// away in a few tenths of a second as the swing narrows.
+fn rattle(v: &Voice, sound: &GuitarSound, out: &mut [f32], rng: &mut Pcg32) {
+    let sr = sound.sample_rate;
+    let first = (v.start * sr).round().max(0.0) as usize;
+    let last = (((v.start + 0.6).min(v.end)) * sr) as usize;
+    let f0 = 440.0 * 2f64.powf((v.midi - 69.0) / 12.0);
+    let level = match v.excitation {
+        Excitation::Pick { level, .. } | Excitation::Legato { level } | Excitation::Harmonic { level, .. } | Excitation::Dead { level } => level,
+    };
+    // Noise kept between ~1.5 and ~6 kHz.
+    let (hp, lp) = ((-TAU * 1500.0 / sr).exp() as f32, 1.0 - (-TAU * 6000.0 / sr).exp() as f32);
+    let (mut low, mut band) = (0.0f32, 0.0f32);
+    let last = last.min(out.len());
+    for (i, x) in out.iter_mut().enumerate().take(last).skip(first) {
+        let t = (i - first) as f64 / sr;
+        let slap = (TAU * f0 * t).sin().max(0.0).powi(8) as f32;
+        let n = rng.gauss();
+        low = hp * low + (1.0 - hp) * n;
+        band += lp * ((n - low) - band);
+        *x += 0.35 * v.buzz * level * slap * band * (-t / 0.18).exp() as f32;
+    }
 }
 
 /// Pitch offset (semitones) `t` seconds after the attack.
@@ -285,7 +315,7 @@ mod tests {
     use crate::pitch::{Mpm, PitchConfig, PitchDetector};
 
     fn voice(midi: f64, start: f64, end: f64) -> Voice {
-        Voice { string: 0, start, end, midi, glide: Vec::new(), vibrato: 0.0, excitation: Excitation::Pick { level: 1.0, pos: 0.15 }, palm: false, recorded: None }
+        Voice { string: 0, start, end, midi, glide: Vec::new(), vibrato: 0.0, excitation: Excitation::Pick { level: 1.0, pos: 0.15 }, palm: false, recorded: None, buzz: 0.0 }
     }
 
     /// Pitch (MIDI) of `x` around `at` seconds.
@@ -329,5 +359,22 @@ mod tests {
         let x = render(&[v, voice(64.0, 0.5, 0.9)], 1.0, &GuitarSound { hum: 0.0, hiss: 0.0, ..GuitarSound::default() }, 4);
         let energy = |a: f64, b: f64| x[(a * 48_000.0) as usize..(b * 48_000.0) as usize].iter().map(|v| v * v).sum::<f32>();
         assert!(energy(0.1, 0.16) > 0.0 && energy(0.25, 0.45) < 1e-9, "silent long before the next note");
+    }
+
+    #[test]
+    fn a_buzzing_string_rattles_bright_at_first_then_rings_as_itself() {
+        let quiet = GuitarSound { hum: 0.0, hiss: 0.0, ..GuitarSound::default() };
+        let plain = render(&[voice(52.0, 0.1, 1.5)], 1.6, &quiet, 9);
+        let buzzing = render(&[Voice { buzz: 1.0, ..voice(52.0, 0.1, 1.5) }], 1.6, &quiet, 9);
+        // Energy above ~2 kHz (a difference of neighbouring samples), relative to the whole.
+        let bright = |x: &[f32], a: f64, b: f64| {
+            let cut = &x[(a * 48_000.0) as usize..(b * 48_000.0) as usize];
+            let high: f32 = cut.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+            high / cut.iter().map(|v| v * v).sum::<f32>()
+        };
+        assert!(bright(&buzzing, 0.1, 0.35) > 3.0 * bright(&plain, 0.1, 0.35), "the rattle at the attack");
+        assert!(bright(&buzzing, 1.0, 1.4) < 1.5 * bright(&plain, 1.0, 1.4), "gone once the swing narrows");
+        // Still the note: a pitch tracker hears E3.
+        assert!((pitch_at(&buzzing, 0.5) - 52.0).abs() < 0.3);
     }
 }

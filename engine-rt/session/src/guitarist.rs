@@ -27,23 +27,83 @@ pub struct Player {
     pub let_ring: f64,
     /// Each string this many cents out of tune at most.
     pub detune: f64,
+    /// A beginner's hands, per note or chord played right: a string that buzzes against the
+    /// fret, a finger pressing so hard the note goes sharp, a finger too light (a note: it only
+    /// thuds; a chord: one string thuds), the pick scratching the strings just before, a chord
+    /// strummed while the fingers are still on their way from the last one.
+    pub buzz: f64,
+    pub sharp: f64,
+    pub dead: f64,
+    pub scratch: f64,
+    pub unformed: f64,
 }
 
 impl Player {
     /// Every note right, on time give or take a few ms, strings damped as they should.
     pub fn clean() -> Player {
-        Player { name: "clean", bias: 0.0, spread: 0.006, skip: 0.0, off_time: 0.0, wrong: 0.0, partial: 0.0, brushed: 0.0, let_ring: 0.1, detune: 4.0 }
+        Player { name: "clean", bias: 0.0, spread: 0.006, skip: 0.0, off_time: 0.0, wrong: 0.0, partial: 0.0, brushed: 0.0, let_ring: 0.1, detune: 4.0, ..Player::HANDS_OK }
     }
 
     /// A good amateur: a little late, a few slips, chords sometimes short of a string.
     pub fn good() -> Player {
-        Player { name: "good", bias: 0.012, spread: 0.022, skip: 0.03, off_time: 0.03, wrong: 0.04, partial: 0.1, brushed: 0.1, let_ring: 0.35, detune: 8.0 }
+        Player {
+            name: "good",
+            bias: 0.012,
+            spread: 0.022,
+            skip: 0.03,
+            off_time: 0.03,
+            wrong: 0.04,
+            partial: 0.1,
+            brushed: 0.1,
+            let_ring: 0.35,
+            detune: 8.0,
+            buzz: 0.03,
+            sharp: 0.03,
+            dead: 0.01,
+            scratch: 0.03,
+            unformed: 0.02,
+        }
     }
 
     /// Learning: late and uneven, many notes left out or wrong, strings ringing everywhere.
     pub fn beginner() -> Player {
-        Player { name: "beginner", bias: 0.03, spread: 0.04, skip: 0.15, off_time: 0.1, wrong: 0.12, partial: 0.25, brushed: 0.25, let_ring: 0.7, detune: 15.0 }
+        Player {
+            name: "beginner",
+            bias: 0.03,
+            spread: 0.04,
+            skip: 0.15,
+            off_time: 0.1,
+            wrong: 0.12,
+            partial: 0.25,
+            brushed: 0.25,
+            let_ring: 0.7,
+            detune: 15.0,
+            buzz: 0.15,
+            sharp: 0.1,
+            dead: 0.08,
+            scratch: 0.12,
+            unformed: 0.12,
+        }
     }
+
+    /// Hands that never buzz, press too hard or too lightly, scratch, or strum early.
+    const HANDS_OK: Player = Player {
+        name: "",
+        bias: 0.0,
+        spread: 0.0,
+        skip: 0.0,
+        off_time: 0.0,
+        wrong: 0.0,
+        partial: 0.0,
+        brushed: 0.0,
+        let_ring: 0.0,
+        detune: 0.0,
+        buzz: 0.0,
+        sharp: 0.0,
+        dead: 0.0,
+        scratch: 0.0,
+        unformed: 0.0,
+    };
 
     pub fn by_name(name: &str) -> Option<Player> {
         [Player::clean(), Player::good(), Player::beginner()].into_iter().find(|p| p.name == name)
@@ -64,13 +124,26 @@ pub enum Played {
     /// A wrong fret: `semitones` off (a note), or one string of a chord off.
     Wrong { semitones: i32 },
     Skipped,
+    /// The right note or chord, a string buzzing against the fret.
+    Buzzed,
+    /// The right note pressed so hard it sounds 20 to 40 cents sharp.
+    Sharp,
+    /// A note pressed too lightly: a thud, no pitch.
+    Dead,
+    /// A chord with one string pressed too lightly (a thud among the others).
+    Muffled,
+    /// The right note or chord, the pick scratching the strings just before.
+    Scratched,
+    /// A chord strummed before the fingers got there: half its strings still where the last
+    /// chord had them.
+    Unformed,
 }
 
 impl Played {
     /// What a fair judge says: what was played right counts, a chord short of a string or with
     /// a string brushed too included.
     pub fn deserves_hit(&self) -> bool {
-        matches!(self, Played::Clean | Played::Partial | Played::Brushed)
+        matches!(self, Played::Clean | Played::Partial | Played::Brushed | Played::Buzzed | Played::Sharp | Played::Muffled | Played::Scratched)
     }
 
     pub fn label(&self) -> &'static str {
@@ -81,6 +154,12 @@ impl Played {
             Played::OffTime { .. } => "hors du temps",
             Played::Wrong { .. } => "fausse note",
             Played::Skipped => "pas jouée",
+            Played::Buzzed => "corde qui frise",
+            Played::Sharp => "un peu haute (doigt trop appuyé)",
+            Played::Dead => "étouffée (doigt pas assez appuyé)",
+            Played::Muffled => "accord + une corde étouffée",
+            Played::Scratched => "bruit de médiator juste avant",
+            Played::Unformed => "accord pas encore en place",
         }
     }
 }
@@ -99,6 +178,25 @@ pub struct Performance {
 const LEAD: f64 = 2.0;
 /// Open strings of the guitars the recorded notes come from (E standard).
 const RECORDED_OPEN: [i32; 6] = [40, 45, 50, 55, 59, 64];
+
+/// The pick scratching across a string or two, muted by the other hand, 60 to 150 ms before
+/// `at`: a click and a thud, no pitch.
+fn scratch(rng: &mut Pcg32, at: f64, strings: usize, chart: &Chart, detune: &[f64]) -> Voice {
+    let s = (rng.next_u32() as usize) % strings.max(1);
+    let start = at - rng.range(0.06, 0.15) as f64;
+    Voice {
+        string: s,
+        start,
+        end: start + 0.05,
+        midi: chart.arrangement.tuning.strings[s] as f64 + detune[s],
+        glide: Vec::new(),
+        vibrato: 0.0,
+        excitation: Excitation::Dead { level: rng.range(0.3, 0.6) },
+        palm: false,
+        recorded: None,
+        buzz: 0.0,
+    }
+}
 
 /// The fret of a recorded (E standard) guitar that sounds `midi` on `string`, if it has one.
 fn recorded_fret(string: usize, midi: i32) -> Option<i32> {
@@ -123,6 +221,10 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
     let detune: Vec<f64> = (0..strings).map(|_| player.detune / 100.0 * (2.0 * rng.uniform() as f64 - 1.0)).collect();
     let t0 = items.first().map_or(0.0, |e| e.time) - LEAD;
     let chance = |rng: &mut Pcg32, p: f64| (rng.uniform() as f64) < p;
+    // The beginner's defects draw only when they can happen: the other players' notes stay as
+    // they were.
+    let maybe = |rng: &mut Pcg32, p: f64| p > 0.0 && (rng.uniform() as f64) < p;
+    let mut last_chord: Option<Vec<i32>> = None;
 
     // (string, time, voice, damped when the hand moves on)
     let mut voices: Vec<(Voice, bool)> = Vec::new();
@@ -210,7 +312,7 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                 } else {
                     at + n.sustain.max(next - e.time + rng.range(0.02, 0.08) as f64)
                 };
-                let voice = Voice {
+                let mut voice = Voice {
                     string: s,
                     start: at,
                     end,
@@ -220,7 +322,26 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                     excitation,
                     palm: tech.palm_mute == Some(true),
                     recorded,
+                    buzz: 0.0,
                 };
+                let pressed = fret > 0 && matches!(voice.excitation, Excitation::Pick { .. } | Excitation::Legato { .. });
+                if played == Played::Clean && pressed {
+                    if maybe(&mut rng, player.buzz) {
+                        voice.buzz = rng.range(0.5, 1.0);
+                        played = Played::Buzzed;
+                    } else if maybe(&mut rng, player.sharp) {
+                        voice.midi += rng.range(0.2, 0.4) as f64;
+                        voice.recorded = None; // the recordings are in tune
+                        played = Played::Sharp;
+                    } else if maybe(&mut rng, player.dead) {
+                        voice.excitation = Excitation::Dead { level };
+                        played = Played::Dead;
+                    }
+                }
+                if played == Played::Clean && maybe(&mut rng, player.scratch) {
+                    voices.push((scratch(&mut rng, at, strings, chart, &detune), true));
+                    played = Played::Scratched;
+                }
                 voices.push((voice, !ring));
             }
             (Target::Chord { template, .. }, _) => {
@@ -233,7 +354,11 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                     sounding.remove(drop);
                     played = Played::Partial;
                 } else if played == Played::Clean && chance(&mut rng, player.brushed) {
-                    let free: Vec<usize> = (0..strings).filter(|s| frets.get(*s).is_none_or(|f| *f < 0)).collect();
+                    // The pick crosses the string next to the chord's on its way: the one just
+                    // below its lowest or just above its highest.
+                    let lo = sounding.first().map_or(0, |sf| sf.0);
+                    let hi = sounding.last().map_or(0, |sf| sf.0);
+                    let free: Vec<usize> = [lo.checked_sub(1), Some(hi + 1)].into_iter().flatten().filter(|&s| s < strings && frets.get(s).is_none_or(|f| *f < 0)).collect();
                     if let Some(&s) = free.get((rng.next_u32() as usize) % free.len().max(1)) {
                         sounding.push((s, 0));
                         played = Played::Brushed;
@@ -245,6 +370,36 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                         sf.1 = (sf.1 + semitones).max(0);
                     }
                 }
+                // A beginner's hand: (string, thuds, buzzes) for the strings that differ.
+                let mut thud: Option<usize> = None;
+                let mut buzzing: Option<usize> = None;
+                if played == Played::Clean {
+                    let previous = last_chord.as_ref().filter(|p| p.as_slice() != frets.as_slice());
+                    if let Some(prev) = previous.filter(|_| maybe(&mut rng, player.unformed)) {
+                        // Half the strings, the bass first, still where the last chord had them.
+                        let moved: Vec<usize> = sounding.iter().map(|sf| sf.0).filter(|&s| prev.get(s).is_some_and(|&f| f >= 0 && f != frets[s])).collect();
+                        if !moved.is_empty() {
+                            for sf in sounding.iter_mut().filter(|sf| moved[..moved.len().div_ceil(2)].contains(&sf.0)) {
+                                sf.1 = prev[sf.0];
+                            }
+                            played = Played::Unformed;
+                        }
+                    } else if sounding.len() >= 4 && maybe(&mut rng, player.dead) {
+                        thud = Some(sounding[1 + (rng.next_u32() as usize) % (sounding.len() - 1)].0);
+                        played = Played::Muffled;
+                    } else if maybe(&mut rng, player.buzz) {
+                        let fretted: Vec<usize> = sounding.iter().filter(|sf| sf.1 > 0).map(|sf| sf.0).collect();
+                        if let Some(&s) = fretted.get((rng.next_u32() as usize) % fretted.len().max(1)) {
+                            buzzing = Some(s);
+                            played = Played::Buzzed;
+                        }
+                    }
+                }
+                if played == Played::Clean && maybe(&mut rng, player.scratch) {
+                    voices.push((scratch(&mut rng, at, strings, chart, &detune), true));
+                    played = Played::Scratched;
+                }
+                last_chord = Some(frets.clone());
                 sounding.sort_by_key(|sf| sf.0);
                 if c.strum.as_deref() == Some("up") {
                     sounding.reverse();
@@ -261,12 +416,15 @@ pub fn perform_with(chart: &Chart, level: u32, player: &Player, seed: u64, sampl
                     } else {
                         start + c.sustain.max(next - e.time + rng.range(0.02, 0.08) as f64)
                     };
-                    let excitation =
-                        if tech.mute == Some(true) { Excitation::Dead { level: level * 0.7 } } else { Excitation::Pick { level: level * 0.8, pos: rng.range(0.1, 0.25) } };
+                    let excitation = if tech.mute == Some(true) || thud == Some(s) {
+                        Excitation::Dead { level: level * 0.7 }
+                    } else {
+                        Excitation::Pick { level: level * 0.8, pos: rng.range(0.1, 0.25) }
+                    };
                     let kind = if tech.palm_mute == Some(true) { Kind::PalmMute } else { Kind::Plain };
                     let recorded = recorded_fret(s, open.round() as i32 + fret).map(|f| (f, kind, rng.next_u32()));
                     let voice =
-                        Voice { string: s, start, end, midi: open + fret as f64, glide: Vec::new(), vibrato: 0.0, excitation, palm: tech.palm_mute == Some(true), recorded };
+                        Voice { string: s, start, end, midi: open + fret as f64, glide: Vec::new(), vibrato: 0.0, excitation, palm: tech.palm_mute == Some(true), recorded, buzz: if buzzing == Some(s) { rng.range(0.5, 1.0) } else { 0.0 } };
                     voices.push((voice, !ring));
                 }
             }

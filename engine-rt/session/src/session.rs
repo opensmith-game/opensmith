@@ -8,7 +8,7 @@ use opensmith_dsp::fx::resample::resample_fast;
 use opensmith_dsp::notefeat::{NoteFeatures, BINS, HOP, PER_SEMITONE, WINDOW};
 use opensmith_dsp::notenet::NoteNet;
 use opensmith_dsp::{ChainParams, ChordConfig, ChordVerifier, TrackerEvent, TunerAnalyzer, TunerConfig};
-use opensmith_game::{Chart, Game, GameConfig, Score};
+use opensmith_game::{Chart, Game, GameConfig, Score, Target};
 
 use crate::calibration::{Calibration, CalibrationPlan};
 use crate::events::{UiEvent, UiExpected};
@@ -181,12 +181,15 @@ const STRUM_LOOKS: [f64; 3] = [-0.01, 0.015, 0.04];
 
 /// Whether the detector's `probs` (from MIDI `first`) say the chord `pitches` was strummed:
 /// three quarters of its notes heard, and no note foreign to it (not in its pitch classes) heard
-/// surely.
-fn strummed(first: i32, probs: &[f32], pitches: &[i32]) -> bool {
+/// surely, but for an open string next to the chord's that the strum brushed on its way
+/// (`brushable`): beginners do it all the time, and it is still the chord.
+fn strummed(first: i32, probs: &[f32], pitches: &[i32], brushable: &[i32]) -> bool {
     let p = |m: i32| probs.get((m - first) as usize).copied().unwrap_or(0.0);
     let heard = pitches.iter().filter(|&&m| p(m) >= HEARD).count();
     let classes: Vec<i32> = pitches.iter().map(|m| m.rem_euclid(12)).collect();
-    let foreign = (0..probs.len() as i32).map(|k| k + first).any(|m| !classes.contains(&m.rem_euclid(12)) && p(m) >= WRONG);
+    let foreign = (0..probs.len() as i32)
+        .map(|k| k + first)
+        .any(|m| !classes.contains(&m.rem_euclid(12)) && !brushable.contains(&m) && p(m) >= WRONG);
     4 * heard >= 3 * pitches.len() && !foreign
 }
 
@@ -741,6 +744,10 @@ impl<B: AudioBackend> Session<B> {
             // around `time + lag` on the clock of the attacks and of the guitar's audio.
             let lag = self.cfg.game.input_offset * self.rate;
             for (index, time, pitches) in game.chords_ready(now, listen) {
+                let brushable = match &game.expected()[index].target {
+                    Target::Chord { template, .. } => game.chart().brushable(*template),
+                    Target::Note { .. } => Vec::new(),
+                };
                 let at = time + lag;
                 let attack = self
                     .attacks
@@ -763,7 +770,7 @@ impl<B: AudioBackend> Session<B> {
                                 None => best = Some((first, probs)),
                             }
                         }
-                        best.is_some_and(|(first, probs)| strummed(first, &probs, &pitches))
+                        best.is_some_and(|(first, probs)| strummed(first, &probs, &pitches, &brushable))
                     }
                     None => strum_audio(monitor, &clock, &self.history, &mut self.scratch, t + offset, window, sr)
                         .is_some_and(|audio| self.verifier.verify(audio, &pitches, a4).accepted),
