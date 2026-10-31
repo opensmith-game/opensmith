@@ -109,6 +109,24 @@ def _parser() -> argparse.ArgumentParser:
 
     sub.add_parser("bench-guitarset", help="fingering agreement with GuitarSet guitarists")
 
+    bench = sub.add_parser("bench", help="the MP3 pipeline measured against a library's hand-written charts, stage by stage")
+    bench.add_argument("library", type=Path, help="a library folder (one song per folder, as the app keeps them)")
+    bench.add_argument("--limit", type=int, default=30, help="songs drawn at random (0: all)")
+    bench.add_argument("--seed", type=int, default=1, help="which songs are drawn")
+    bench.add_argument("--work", type=Path, default=Path.home() / ".cache" / "opensmith-bench", help="cache of stems, transcriptions and results")
+    bench.add_argument("--mix", action="store_true", help="also Basic Pitch on the whole mix (what separation changes)")
+    bench.add_argument("--rechart", action="store_true", help="rebuild the cached charts with the current rules (no separation)")
+    bench.add_argument("--again", action="store_true", help="measure the cached songs again")
+    bench.add_argument("--ablation", action="store_true", help="also measure the clean-up with each of its steps off")
+    bench.add_argument("--offset", type=int, default=0, help="skip this many songs of the draw (a held-out set: --offset 100)")
+    bench.add_argument("--device", choices=["cuda", "mps", "cpu"])
+    bench.add_argument("--label", help="name of the run in the dashboard (default: the source revision)")
+
+    view = sub.add_parser("bench-view", help="the bench's dashboard in the browser: run under way, stages, gains, history")
+    view.add_argument("--work", type=Path, default=Path.home() / ".cache" / "opensmith-bench")
+    view.add_argument("--port", type=int, default=8765)
+    view.add_argument("--library", type=Path, default=Path.home() / "Music" / "OpenSmith", help="the library the bench draws from (its size, for the coverage)")
+
     demo = sub.add_parser("demo", help="the generated demo song shipped with the app (backing track + chart)")
     demo.add_argument("-o", "--out", type=Path, required=True)
 
@@ -246,6 +264,30 @@ def _run(args: argparse.Namespace, emit: Emit | None) -> None:
 
         chart = make_demo(args.out)
         print(f"{chart.artist} — {chart.title}: {len(chart.notes)} notes, {len(chart.chords)} chords → {args.out}")
+    elif args.cmd == "bench":
+        from .bench import Run, SongResult, measure, references, summary
+
+        songs = references(args.library, None, args.seed)[args.offset :]
+        songs = songs[: args.limit] if args.limit else songs
+        print(f"{len(songs)} hand-written charts drawn from {args.library}; work in {args.work}")
+        options = {"limit": args.limit, "offset": args.offset, "seed": args.seed, "mix": args.mix, "rechart": args.rechart, "again": args.again, "ablation": args.ablation}
+        run = Run(args.work, len(songs), options, args.label)
+        for k, song in enumerate(songs, 1):
+            run.progress(song.name)
+            try:
+                r = measure(song, args.work / song.name, mix=args.mix, again=args.again, rechart=args.rechart, ablation=args.ablation, device=args.device)
+            except Exception as e:  # one song failing leaves the others measured
+                r = SongResult(song.name, song.name, "", "", "", error=f"{type(e).__name__}: {e}")
+            run.add(r)
+            stages = ", ".join(f"{name} {s.f1():.0%}" for name, s in r.stages.items())
+            print(f"{k}/{len(songs)} {r.artist} — {r.title}: {r.error or stages} ({r.seconds:.0f} s)", flush=True)
+        run.save(finished=True)
+        run.progress(None, finished=True)
+        print(summary(run.results))
+    elif args.cmd == "bench-view":
+        from .bench_view import serve
+
+        serve(args.work, args.port, args.library)
     elif args.cmd == "bench-guitarset":
         from .benchmark import evaluate, fetch_annotations
 

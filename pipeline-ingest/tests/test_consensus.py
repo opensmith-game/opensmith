@@ -103,3 +103,17 @@ def test_a_note_heard_in_two_octaves_across_repeats_counts_once():
     second[2], third[2] = (Note(n.time, 57, n.duration, n.velocity) for n in (second[2], third[2]))
     out, _ = consensus(first + second + third, PHRASES, GRID.position, GRID.time_at)
     assert all(relative(out, a, b) == relative(first, 0.0, 2.0) for a, b, _ in PHRASES[:3])
+
+
+def test_repeats_that_agree_on_no_octave_are_left_as_heard():
+    # The same note in four repeats, four octaves apart: no third agrees on one (this used to
+    # stop the import). The vote then settles it like any note heard in no majority of repeats,
+    # and the rest of the riff stays.
+    phrases = [(2.0 * k, 2.0 * k + 2.0, "A") for k in range(4)]
+    repeats = [riff(2.0 * k) for k in range(4)]
+    for k, r in enumerate(repeats):
+        r[2] = Note(r[2].time, 33 + 12 * k, r[2].duration, r[2].velocity)
+    out, vote = consensus([n for r in repeats for n in r], phrases, GRID.position, GRID.time_at)
+    for a, b, _ in phrases:
+        assert [p for _, p in relative(out, a, b)] == PITCHES[:2] + PITCHES[3:]
+    assert vote.dropped == 4

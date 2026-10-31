@@ -60,27 +60,40 @@ def clean(
     stem: GuitarStem | None = None,
     min_amplitude: float = 0.15,
     merge_gap: float = 0.03,
-    attack_window: float = 0.06,
+    attack_window: float = 0.04,
     legato_amplitude: float = 0.55,
+    reattack_window: float = 0.04,
+    ghost_ratio: float = 3.0,
+    *,
+    ghosts: bool = True,
+    silence: bool = True,
+    consolidated: bool = True,
 ) -> list[Note]:
     """Merges fragments, drops notes without an attack, harmonic ghosts, quiet and unplayable notes.
 
     `onsets` (from `attacks`, or the stem's) enables attack gating: a note must start within
     `attack_window` of an attack unless it is loud enough (`legato_amplitude`) to be a hammer-on
-    or pull-off. With the `stem`, notes where it is silent go and simultaneous notes are checked
-    against its pitch (`consolidate`).
+    or pull-off (an empty array turns it off). Fragments of one pitch are merged unless an attack
+    falls within `reattack_window` of the second: then it is the note played again (fast
+    repeated notes, a chugged riff). With the `stem`, notes where it is silent go and
+    simultaneous notes are checked against its pitch (`consolidate`). `ghosts`, `silence` and
+    `consolidated` turn their step off when False (the bench measures each step this way).
     """
     notes = [n for n in raw if tuning.playable(n.pitch) and n.amplitude >= min_amplitude]
     if stem is not None:
-        notes = [n for n in notes if stem.audible(n.start)]
+        if silence:
+            notes = [n for n in notes if stem.audible(n.start)]
         if onsets is None:
             onsets = stem.attacks
+
+    def reattacked(n: RawNote) -> bool:
+        return onsets is not None and len(onsets) > 0 and bool(np.min(np.abs(onsets - n.start)) <= reattack_window)
 
     merged: list[RawNote] = []
     last_by_pitch: dict[int, int] = {}
     for n in notes:
         k = last_by_pitch.get(n.pitch)
-        if k is not None and n.start - merged[k].end <= merge_gap:
+        if k is not None and n.start - merged[k].end <= merge_gap and not reattacked(n):
             m = merged[k]
             merged[k] = RawNote(m.start, max(m.end, n.end), m.pitch, max(m.amplitude, n.amplitude))
             continue
@@ -91,7 +104,7 @@ def clean(
         for m in merged:
             if m is n or abs(m.start - n.start) > 0.05:
                 continue
-            if n.pitch - m.pitch in (12, 19, 24) and m.amplitude >= 1.3 * n.amplitude:
+            if n.pitch - m.pitch in (12, 19, 24) and m.amplitude >= ghost_ratio * n.amplitude:
                 return True
         return False
 
@@ -100,9 +113,9 @@ def clean(
             return True
         return bool(np.min(np.abs(onsets - n.start)) <= attack_window)
 
-    kept = [n for n in merged if attacked(n) and not ghost(n)]
+    kept = [n for n in merged if attacked(n) and not (ghosts and ghost(n))]
     out = [Note(n.start, n.pitch, n.end - n.start, n.amplitude) for n in sorted(kept, key=lambda n: (n.start, n.pitch))]
-    return consolidate(out, stem, tuning) if stem is not None else out
+    return consolidate(out, stem, tuning) if stem is not None and consolidated else out
 
 
 # Notes starting this close together are struck together.

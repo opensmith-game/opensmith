@@ -68,9 +68,10 @@ def _agree_octaves(notes: list[Note], groups: dict[str, list[tuple[float, float]
                     by_key[(pos, notes[idx[0]].pitch % 12)].append(idx[0])
         for found in by_key.values():
             octaves = Counter(notes[i].pitch for i in found)
-            if len(octaves) < 2:
-                continue
-            target = min(p for p, k in octaves.items() if 3 * k >= len(found))
+            agreed = [p for p, k in octaves.items() if 3 * k >= len(found)]
+            if len(octaves) < 2 or not agreed:
+                continue  # one octave already, or no third of the repeats agree: left as heard
+            target = min(agreed)
             for i in found:
                 n = notes[i]
                 notes[i] = Note(n.time, target, n.duration, n.velocity)

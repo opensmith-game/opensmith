@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banc d'essai OpenSmith</title>
+<style>
+  :root {
+    --bg: #0f1218; --panel: #171b24; --line: #262c39; --fg: #e7eaf0; --muted: #8b93a7;
+    --accent: #f2a33a; --good: #4cc38a; --bad: #e5645c; --mix: #7a8399; --raw: #5b9cf0; --clean: #a77df0; --chart: #f2a33a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7f9; --panel: #fff; --line: #e3e6ec; --fg: #161a22; --muted: #5f677a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .pill { font-size: 12px; padding: 2px 10px; border-radius: 99px; background: var(--line); color: var(--muted); }
+  .pill.live { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+  .span12 { grid-column: span 12; } .span7 { grid-column: span 7; } .span5 { grid-column: span 5; }
+  @media (max-width: 860px) { .span7, .span5 { grid-column: span 12; } }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s; }
+  .row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); margin-top: 8px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .kpi b { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
+  .kpi span { color: var(--muted); font-size: 12px; }
+  .stage { display: grid; grid-template-columns: 120px 1fr 52px; align-items: center; gap: 10px; margin: 6px 0; }
+  .stage small { color: var(--muted); display: block; font-size: 11px; }
+  .meter { position: relative; height: 22px; background: var(--line); border-radius: 6px; overflow: hidden; }
+  .meter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; opacity: .9; }
+  .meter i.ghost { opacity: .28; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .gains { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .gain { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .gain b { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .gain p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; white-space: normal; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; cursor: pointer; user-select: none; }
+  th.sorted::after { content: " ↓"; } th.sorted.asc::after { content: " ↑"; }
+  td .sub { color: var(--muted); font-size: 12px; }
+  .up { color: var(--good); } .down { color: var(--bad); }
+  .scroll { overflow-x: auto; }
+  input[type=search] { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; width: 240px; max-width: 100%; }
+  .empty { color: var(--muted); padding: 20px 0; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  .banner { display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; align-items: center; }
+  .banner .big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .banner .big small { font-size: 16px; color: var(--muted); font-weight: 500; }
+  .banner .bar { height: 14px; }
+  @media (max-width: 640px) { .banner { grid-template-columns: 1fr; } }
+  .plain { table-layout: fixed; }
+  @media (max-width: 640px) {
+    .plain, .plain tbody, .plain tr { display: block; }
+    .plain tr:first-child { display: none; }
+    .plain tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+    .plain td { display: inline-block; border: 0; padding: 2px 8px 2px 0; text-align: left; }
+    .plain td:first-child { display: block; }
+  }
+  .plain th:nth-child(1) { width: 56%; } .plain th:nth-child(2) { width: 16%; } .plain th:nth-child(3) { width: 14%; } .plain th:nth-child(4) { width: 14%; }
+  .plain td, .plain th { white-space: normal; }
+  .plain td:nth-child(2) { font-size: 17px; font-weight: 700; }
+  .plain td:first-child p { margin: 3px 0 0; color: var(--muted); font-weight: 400; }
+  .verdict { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .v0 { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+  .v1 { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .v2 { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Banc d'essai · transcription MP3</h1>
+    <span class="pill" id="status">…</span>
+    <span class="pill" id="label"></span>
+  </header>
+
+  <div class="grid">
+    <section class="card span12" id="coverage-card">
+      <h2>Bibliothèque analysée</h2>
+      <div class="banner">
+        <div class="big" id="coverage-count">–</div>
+        <div><div class="bar"><i id="coverage-bar" style="width:0;background:var(--good)"></i></div>
+          <div class="row"><span id="coverage-text"></span><span id="coverage-eta"></span></div></div>
+      </div>
+    </section>
+
+    <section class="card span12">
+      <h2>Le banc en clair</h2>
+      <div class="scroll"><table class="plain" id="plain"></table></div>
+      <div class="legend"><span>On fait jouer à l'IA des morceaux dont un humain a déjà écrit la partition de guitare, puis on compare ce qu'elle écrit à ce que l'humain a écrit.</span></div>
+    </section>
+
+    <section class="card span12" id="progress-card">
+      <h2>Run en cours</h2>
+      <div class="bar"><i id="bar" style="width:0"></i></div>
+      <div class="row"><span id="count"></span><span id="current"></span><span id="eta"></span></div>
+    </section>
+
+    <section class="card span12">
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="card span7">
+      <h2>Où on perd des notes</h2>
+      <div id="stages"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>F1 (notes justes, à 50 ms près)</span>
+        <span><i style="background:var(--accent);opacity:.28"></i>F1 en ignorant l'octave</span>
+        <span>R = rappel (notes écrites retrouvées) · P = précision (notes trouvées qui sont justes)</span>
+      </div>
+    </section>
+
+    <section class="card span5">
+      <h2>Ce qu'on peut gagner</h2>
+      <div class="gains" id="gains"></div>
+    </section>
+
+    <section class="card span12" id="ablation-card" hidden>
+      <h2>Nettoyage, étape par étape</h2>
+      <div class="scroll"><table id="ablation"></table></div>
+      <div class="legend"><span>Chaque ligne : le nettoyage complet moins une étape. Un écart positif veut dire que l'étape fait perdre plus de notes justes qu'elle n'enlève de fausses.</span></div>
+    </section>
+
+    <section class="card span12">
+      <h2>Historique des runs</h2>
+      <div id="history"></div>
+    </section>
+
+    <section class="card span12">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <span>Morceaux</span><input type="search" id="filter" placeholder="Filtrer (titre, artiste)">
+      </h2>
+      <div class="scroll"><table id="songs"></table></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const STAGES = { mix: 'Mix entier', raw: 'Piste guitare', clean: 'Notes vérifiées', chart: 'Chart final' };
+const STAGE_HINT = { mix: 'Basic Pitch sans séparation', raw: 'Basic Pitch après Demucs', clean: 'attaques, hauteur, niveau', chart: 'quantifié, voté, doigté' };
+const COLORS = { mix: 'var(--mix)', raw: 'var(--raw)', clean: 'var(--clean)', chart: 'var(--chart)' };
+const pct = (x, d = 1) => x == null ? '–' : (100 * x).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' %';
+const pts = (x) => x == null ? '–' : ((x >= 0 ? '+' : '−') + Math.abs(100 * x).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' pts');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const f1 = (s) => s && (s.reference + s.found) ? 2 * s.matched / (s.reference + s.found) : null;
+const dur = (s) => s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} h`;
+let sort = { key: 'chart', asc: true };
+let last = null;
+
+function progress(p) {
+  const card = document.getElementById('progress-card');
+  const status = document.getElementById('status');
+  if (!p) { card.hidden = true; status.textContent = 'aucun run'; status.className = 'pill'; return; }
+  card.hidden = false;
+  const live = !p.finished;
+  status.textContent = live ? 'en cours' : 'terminé';
+  status.className = 'pill' + (live ? ' live' : '');
+  document.getElementById('label').textContent = p.label;
+  document.getElementById('bar').style.width = `${p.total ? 100 * p.done / p.total : 0}%`;
+  document.getElementById('count').textContent = `${p.done} / ${p.total} morceaux`;
+  document.getElementById('current').textContent = live && p.current ? `En cours : ${p.current}` : '';
+  const each = p.seconds?.length ? p.seconds.reduce((a, b) => a + b, 0) / p.seconds.length : null;
+  const elapsed = ((p.finished ?? Date.now() / 1000) - p.started);
+  document.getElementById('eta').textContent = live
+    ? `${dur(elapsed)} écoulées` + (each ? ` · fin dans ~${dur(each * (p.total - p.done))}` : '')
+    : `Durée : ${dur(elapsed)}`;
+}
+
+function kpis(run, previous) {
+  const s = run?.summary, prev = previous?.summary;
+  const box = document.getElementById('kpis');
+  if (!s) { box.innerHTML = '<div class="empty">Pas encore de morceau mesuré.</div>'; return; }
+  const delta = (a, b) => a != null && b != null ? ` <small class="${a >= b ? 'up' : 'down'}">${pts(a - b)}</small>` : '';
+  const c = s.stages.chart, r = s.stages.raw;
+  box.innerHTML = [
+    ['F1 du chart final', pct(c?.f1) + delta(c?.f1, prev?.stages.chart?.f1)],
+    ['Notes écrites retrouvées', pct(c?.recall) + delta(c?.recall, prev?.stages.chart?.recall)],
+    ['F1 de Basic Pitch (piste guitare)', pct(r?.f1) + delta(r?.f1, prev?.stages.raw?.f1)],
+    ['Doigté identique', pct(s.fingering) + delta(s.fingering, prev?.fingering)],
+    ['Accordage trouvé', `${s.tuning[0]} / ${s.tuning[1]}`],
+    ['Morceaux mesurés', `${s.songs}` + (s.failed ? ` <small class="down">${s.failed} en échec</small>` : '')],
+  ].map(([k, v]) => `<div class="kpi"><b>${v}</b><span>${k}</span></div>`).join('');
+}
+
+function stages(run) {
+  const box = document.getElementById('stages');
+  const s = run?.summary?.stages ?? {};
+  box.innerHTML = Object.keys(STAGES).filter((k) => s[k]).map((k) => {
+    const x = s[k];
+    return `<div class="stage">
+      <div>${STAGES[k]}<small>${STAGE_HINT[k]}</small></div>
+      <div>
+        <div class="meter"><i class="ghost" style="width:${100 * x.any_octave}%;background:${COLORS[k]}"></i><i style="width:${100 * x.f1}%;background:${COLORS[k]}"></i></div>
+        <small style="color:var(--muted)">R ${pct(x.recall, 0)} · P ${pct(x.precision, 0)} · sans hauteur ${pct(x.timing, 0)} · retard ${x.lag_ms == null ? '–' : Math.round(x.lag_ms) + ' ms'}</small>
+      </div>
+      <div class="num"><b>${pct(x.f1, 0)}</b></div>
+    </div>`;
+  }).join('') || '<div class="empty">–</div>';
+}
+
+function gains(run) {
+  const s = run?.summary; const box = document.getElementById('gains');
+  if (!s) { box.innerHTML = ''; return; }
+  const st = s.stages, c = st.chart, raw = st.raw, clean = st.clean, mix = st.mix;
+  const cards = [];
+  if (c) cards.push([pts(c.any_octave - c.f1), 'si les octaves étaient justes', 'Notes trouvées au bon moment et sur la bonne note, mais une octave à côté.']);
+  if (c) cards.push([pts(c.timing - c.f1), 'si toutes les hauteurs étaient justes', 'Attaques au bon moment, note fausse : plafond de ce qu’on gagne sur la hauteur.']);
+  if (raw && clean) cards.push([pts(clean.recall - raw.recall), 'de rappel au nettoyage', 'Notes justes de Basic Pitch jetées par les vérifications de la piste (négatif = trop strict).']);
+  if (raw && mix) cards.push([pts(raw.recall - mix.recall), 'de rappel grâce à la séparation', 'Piste guitare séparée contre mix entier (négatif = la séparation fait perdre des notes).']);
+  if (raw?.lag_ms != null) cards.push([`${Math.round(raw.lag_ms)} ms`, 'de retard médian des attaques', 'Un décalage constant se corrige : à soustraire avant de quantifier.']);
+  if (s.fingering != null) cards.push([pct(s.fingering, 0), 'du doigté comme écrit', 'Parmi les notes justes du chart : même corde et même case que l’auteur.']);
+  box.innerHTML = cards.map(([v, k, p]) => `<div class="gain"><b>${v}</b> ${k}<p>${p}</p></div>`).join('');
+}
+
+function coverage(c) {
+  const card = document.getElementById('coverage-card');
+  if (!c) { card.hidden = true; return; }
+  card.hidden = false;
+  const total = c.total, done = c.analysed;
+  document.getElementById('coverage-count').innerHTML = total ? `${done.toLocaleString('fr-FR')} <small>/ ${total.toLocaleString('fr-FR')} morceaux</small>` : `${done.toLocaleString('fr-FR')} <small>morceaux</small>`;
+  document.getElementById('coverage-bar').style.width = total ? `${Math.min(100, 100 * done / total)}%` : '0';
+  document.getElementById('coverage-text').textContent = total ? `${pct(done / total)} de la bibliothèque passée au banc au moins une fois` : 'Bibliothèque introuvable : lance bench-view avec --library';
+  const left = total ? Math.max(0, total - done) : 0;
+  document.getElementById('coverage-eta').textContent = left && c.seconds_per_song ? `Reste ≈ ${dur(left * c.seconds_per_song)} d’analyse pour tout passer (${Math.round(c.seconds_per_song)} s par morceau)` : (total ? 'Toute la bibliothèque est passée' : '');
+}
+
+const VERDICT = ['à améliorer', 'moyen', 'bon'];
+const level = (x, low, high) => x == null ? null : x < low ? 0 : x < high ? 1 : 2;
+const pill = (v) => v == null ? '' : `<span class="verdict v${v}">${VERDICT[v]}</span>`;
+const per100 = (x) => x == null ? '–' : `${Math.round(100 * x)} sur 100`;
+
+function plain(run, runs) {
+  const s = run?.summary, box = document.getElementById('plain');
+  if (!s?.stages?.chart) { box.innerHTML = '<tr><td class="empty">Pas encore de résultat.</td></tr>'; return; }
+  const c = s.stages.chart, raw = s.stages.raw;
+  const first = last?.baseline?.summary;
+  const prog = (now, then, better = 'up') => {
+    if (now == null || then == null) return '';
+    const d = now - then; if (Math.abs(d) < 0.001) return '<span class="sub">=</span>';
+    const good = better === 'up' ? d > 0 : d < 0;
+    return `<span class="${good ? 'up' : 'down'}">${pts(d)}</span>`;
+  };
+  const [tuned, measured] = s.tuning;
+  const rows = [
+    ['Notes du guitariste retrouvées', per100(c.recall), `Sur 100 notes que l’humain a écrites, l’IA en retrouve ${Math.round(100 * c.recall)} au bon moment et à la bonne hauteur.`, level(c.recall, 0.3, 0.6), prog(c.recall, first?.stages.chart?.recall)],
+    ['Notes de l’IA qui sont justes', per100(c.precision), `Sur 100 notes que l’IA propose, ${Math.round(100 * c.precision)} sont vraiment dans la partition. Les autres viennent d’autres instruments (chant, basse, seconde guitare) ou sont des erreurs.`, level(c.precision, 0.3, 0.6), prog(c.precision, first?.stages.chart?.precision)],
+    ['Note globale', `${Math.round(100 * c.f1)} / 100`, 'Combine les deux lignes du dessus : 100 voudrait dire une partition identique à celle de l’humain. Sur un vrai morceau, avec tous les instruments mélangés, c’est bien plus dur que sur une guitare enregistrée seule.', level(c.f1, 0.3, 0.6), prog(c.f1, first?.stages.chart?.f1)],
+    ['Bon moment, mauvaise note', per100(Math.max(0, c.timing - c.f1)), 'L’IA entend qu’une note est jouée à cet instant, mais se trompe sur laquelle. C’est ce qu’on gagnerait avec une meilleure reconnaissance de la hauteur.', level(1 - (c.timing - c.f1) * 3, 0.4, 0.7), ''],
+    ['Bonne note, mais une octave à côté', per100(Math.max(0, c.any_octave - c.f1)), 'Même note, mais trop aiguë ou trop grave d’un cran (comme un do grave pris pour un do aigu). C’est l’erreur la plus facile à corriger.', level(1 - (c.any_octave - c.f1) * 5, 0.4, 0.7), ''],
+    ['Accordage de la guitare reconnu', `${tuned} sur ${measured}`, 'Beaucoup de groupes accordent leur guitare plus grave que la normale. Si l’IA ne le voit pas, elle place les notes au mauvais endroit du manche.', level(measured ? tuned / measured : null, 0.5, 0.85), prog(measured ? tuned / measured : null, first?.tuning?.[1] ? first.tuning[0] / first.tuning[1] : null)],
+    ['Même position sur le manche que l’humain', per100(s.fingering), 'Une même note peut se jouer à plusieurs endroits de la guitare. Ici : la part des notes justes que l’IA place exactement là où l’humain les a mises.', level(s.fingering, 0.3, 0.6), prog(s.fingering, first?.fingering)],
+    ['Décalage des notes détectées', raw?.lag_ms == null ? '–' : `${Math.round(raw.lag_ms)} ms`, 'Retard moyen entre le moment où la note est jouée et celui où l’IA la place. Sous 20 ms, c’est imperceptible pour le joueur.', raw?.lag_ms == null ? null : Math.abs(raw.lag_ms) < 20 ? 2 : Math.abs(raw.lag_ms) < 40 ? 1 : 0, ''],
+  ];
+  const since = first ? `<th>Progrès depuis « ${esc(last.baseline.label)} »</th>` : '';
+  box.innerHTML = `<tr><th>Ce qu’on mesure</th><th>Résultat</th><th>Verdict</th>${since}</tr>`
+    + rows.map(([k, v, e, l, p]) => `<tr><td><b>${k}</b><p>${e}</p></td><td>${v}</td><td>${pill(l)}</td>${first ? `<td>${p}</td>` : ''}</tr>`).join('');
+}
+
+const STEPS = {
+  amplitude: ['Amplitude minimale', 'notes trop faibles pour Basic Pitch'],
+  silence: ['Guitare audible', 'notes là où la piste se tait'],
+  attack: ['Attaque exigée', 'pas d’attaque à moins de 60 ms (sauf legato fort)'],
+  ghosts: ['Harmoniques fantômes', 'octave, quinte ou double octave d’une note plus forte'],
+  merge: ['Fusion des fragments', 'même note recoupée en morceaux'],
+  consolidate: ['Octaves et doublons (YIN)', 'octave corrigée, ligne mélodique dédoublée'],
+};
+
+function ablation(run) {
+  const card = document.getElementById('ablation-card');
+  const a = run?.summary?.ablation ?? {}, clean = run?.summary?.stages?.clean;
+  const keys = Object.keys(STEPS).filter((k) => a[k]);
+  card.hidden = !keys.length || !clean;
+  if (card.hidden) return;
+  const rows = keys.map((k) => {
+    const x = a[k], d = x.f1 - clean.f1;
+    const verdict = d > 0.002 ? '<span class="down">à revoir</span>' : d < -0.002 ? '<span class="up">utile</span>' : 'neutre';
+    return `<tr><td>Sans « ${STEPS[k][0]} »<div class="sub">${STEPS[k][1]}</div></td><td>${pct(x.recall)}</td><td>${pct(x.precision)}</td><td>${pct(x.f1)}</td><td><span class="${d > 0 ? 'down' : 'up'}">${pts(d)}</span></td><td>${verdict}</td></tr>`;
+  }).join('');
+  document.getElementById('ablation').innerHTML = `<tr><th>Étape retirée</th><th>Rappel</th><th>Précision</th><th>F1</th><th>Écart F1</th><th>L’étape est…</th></tr>`
+    + `<tr><td><b>Nettoyage complet</b></td><td>${pct(clean.recall)}</td><td>${pct(clean.precision)}</td><td>${pct(clean.f1)}</td><td></td><td></td></tr>` + rows;
+}
+
+function history(runs) {
+  const box = document.getElementById('history');
+  const done = runs.filter((r) => r.summary?.songs);
+  if (!done.length) { box.innerHTML = '<div class="empty">L’historique se remplit à chaque run (<code>opensmith-ingest bench --label …</code>).</div>'; return; }
+  const W = 1000, H = 220, L = 40, R = 16, T = 12, B = 30;
+  const xs = (i) => L + (done.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (done.length - 1));
+  const ys = (v) => T + (1 - v) * (H - T - B);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="F1 par étage au fil des runs">`;
+  for (const v of [0, .25, .5, .75, 1]) svg += `<line x1="${L}" x2="${W - R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${ys(v) + 4}" text-anchor="end">${v * 100}%</text>`;
+  for (const k of Object.keys(STAGES)) {
+    const pts_ = done.map((r, i) => r.summary.stages[k] ? [xs(i), ys(r.summary.stages[k].f1), r.summary.stages[k].f1] : null).filter(Boolean);
+    if (!pts_.length) continue;
+    svg += `<polyline fill="none" stroke="${COLORS[k]}" stroke-width="2" points="${pts_.map((p) => p.slice(0, 2).join(',')).join(' ')}"/>`;
+    svg += pts_.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${COLORS[k]}"><title>${STAGES[k]} · ${esc(done[i].label)} : ${pct(p[2])}</title></circle>`).join('');
+  }
+  done.forEach((r, i) => { svg += `<text x="${xs(i)}" y="${H - 8}" text-anchor="middle">${esc(r.label).slice(0, 18)}</text>`; });
+  svg += '</svg>';
+  const legend = `<div class="legend">${Object.keys(STAGES).map((k) => `<span><i style="background:${COLORS[k]}"></i>${STAGES[k]}</span>`).join('')}</div>`;
+  const rows = done.slice().reverse().map((r, i, all) => {
+    const prev = all[i + 1]?.summary?.stages.chart?.f1, cur = r.summary.stages.chart?.f1;
+    const d = prev != null && cur != null ? `<span class="${cur >= prev ? 'up' : 'down'}">${pts(cur - prev)}</span>` : '';
+    const opts = r.options ?? {};
+    const when = r.started ? new Date(r.started * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    return `<tr><td>${esc(r.label)} <span class="sub">${when}${opts.rechart ? ' · rechart' : ''}${opts.mix ? ' · mix' : ''}</span></td><td>${r.summary.songs}</td><td>${pct(r.summary.stages.raw?.f1)}</td><td>${pct(r.summary.stages.clean?.f1)}</td><td>${pct(cur)}</td><td>${d}</td></tr>`;
+  }).join('');
+  box.innerHTML = svg + legend + `<div class="scroll" style="margin-top:12px"><table><tr><th>Run</th><th>Morceaux</th><th>Piste guitare</th><th>Vérifiées</th><th>Chart</th><th>Écart</th></tr>${rows}</table></div>`;
+}
+
+function songs(run, previous) {
+  const table = document.getElementById('songs');
+  const before = new Map((previous?.songs ?? []).map((s) => [s.song, s]));
+  const q = document.getElementById('filter').value.trim().toLowerCase();
+  const list = (run?.songs ?? []).filter((s) => !q || `${s.title} ${s.artist}`.toLowerCase().includes(q)).map((s) => ({
+    s, mix: f1(s.stages.mix), raw: f1(s.stages.raw), clean: f1(s.stages.clean), chart: f1(s.stages.chart),
+    fingering: s.fingering_matched ? s.fingering_same / s.fingering_matched : null,
+    delta: before.has(s.song) && f1(s.stages.chart) != null ? f1(s.stages.chart) - f1(before.get(s.song).stages.chart) : null,
+    title: `${s.artist} ${s.title}`.toLowerCase(),
+  }));
+  const k = sort.key;
+  list.sort((a, b) => (k === 'title' ? a.title.localeCompare(b.title) : (a[k] ?? -1) - (b[k] ?? -1)) * (sort.asc ? 1 : -1));
+  const cols = [['title', 'Morceau'], ['tuning', 'Accordage'], ['mix', 'Mix'], ['raw', 'Piste guitare'], ['clean', 'Vérifiées'], ['chart', 'Chart'], ['fingering', 'Doigté'], ['delta', 'Écart']];
+  const head = '<tr>' + cols.map(([key, name]) => `<th data-key="${key}" class="${sort.key === key ? 'sorted' + (sort.asc ? ' asc' : '') : ''}">${name}</th>`).join('') + '</tr>';
+  const body = list.map(({ s, mix, raw, clean, chart, fingering, delta }) => {
+    const tuningOk = s.tuning_found && !s.tuning_found.includes('(written');
+    return `<tr>
+      <td>${esc(s.title)}<div class="sub">${esc(s.artist)}${s.error ? ` · <span class="down">${esc(s.error)}</span>` : ''}</div></td>
+      <td><span class="${tuningOk ? 'up' : 'down'}">${tuningOk ? '✓' : '✗'}</span> ${esc(s.tuning)}${tuningOk ? '' : `<div class="sub">trouvé : ${esc((s.tuning_found ?? '').replace(/ \(written.*/, ''))}</div>`}</td>
+      <td>${pct(mix, 0)}</td><td>${pct(raw, 0)}</td><td>${pct(clean, 0)}</td><td><b>${pct(chart, 0)}</b></td><td>${pct(fingering, 0)}</td>
+      <td>${delta == null ? '' : `<span class="${delta >= 0 ? 'up' : 'down'}">${pts(delta)}</span>`}</td></tr>`;
+  }).join('');
+  table.innerHTML = head + (body || `<tr><td colspan="8" class="empty">Aucun morceau.</td></tr>`);
+}
+
+function render(state) {
+  last = state;
+  coverage(state.coverage);
+  plain(state.latest, state.runs ?? []);
+  progress(state.progress);
+  kpis(state.latest, state.previous);
+  stages(state.latest);
+  gains(state.latest);
+  ablation(state.latest);
+  history(state.runs ?? []);
+  songs(state.latest, state.previous);
+}
+
+document.getElementById('songs').addEventListener('click', (e) => {
+  const key = e.target.closest('th')?.dataset.key;
+  if (!key || key === 'tuning') return;
+  sort = { key, asc: sort.key === key ? !sort.asc : key === 'title' };
+  if (last) songs(last.latest, last.previous);
+});
+document.getElementById('filter').addEventListener('input', () => last && songs(last.latest, last.previous));
+
+async function poll() {
+  try {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    if (r.ok) render(await r.json());
+  } catch { /* the bench server stopped: try again */ }
+  setTimeout(poll, 2000);
+}
+poll();
+</script>
+</body>
+</html>

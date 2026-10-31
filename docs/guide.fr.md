@@ -90,6 +90,18 @@ Caler une tablature Guitar Pro sur un morceau déjà converti (`audio` le fait s
 uv run opensmith-ingest retab morceau.gp4 -o ../out/chanson
 ```
 
+Importer un feedpak (dossier ou archive `.feedpak`), son chart écrit à la main et son audio (`--list` montre ses arrangements, `--arrangement` en choisit un) :
+
+```bash
+uv run opensmith-ingest feedpak morceau.feedpak -o ../out/morceau
+```
+
+Mesurer le pipeline MP3 contre les charts écrits à la main d'une bibliothèque : chaque morceau tiré au hasard repasse par le pipeline depuis son audio, et chaque étage (transcription brute, notes vérifiées, chart final ; `--mix` ajoute la transcription du mix sans séparation) est comparé à ce qui a été écrit. Le cache (`~/.cache/opensmith-bench`) garde la piste guitare et les transcriptions : `--rechart` remesure une nouvelle règle de chart en quelques secondes par morceau, sans refaire la séparation.
+
+```bash
+uv run opensmith-ingest bench ~/Music/OpenSmith --limit 30 --mix
+```
+
 Tests Python (rapides, puis de bout en bout ~20 s) :
 
 ```bash
