@@ -86,8 +86,12 @@ entrée dans **Réglages → Audio & guitare**. Le câble, lui, est simplement t
 ajoute une commande d'import (voir [CONTRIBUTING.md](CONTRIBUTING.md)). Une fois installé,
 l'app accepte ses fichiers comme des MP3.
 
-**Windows, Linux, Mac Intel ?** Pas aujourd'hui. Le moteur audio utilise CoreAudio, et le
-convertisseur compte sur Apple Silicon pour séparer les pistes en un temps raisonnable.
+**Windows, Linux, Mac Intel ?** Pas encore. Les portages Windows et Linux sont en cours ; le
+plus dur est une latence jouable à la guitare. Sous Windows, le mode audio partagé ajoute 25 à
+40 ms : le moteur doit passer par le mode exclusif WASAPI ou par ASIO. Sous Linux, il faut
+PipeWire (ou JACK) et vérifier que la piste de notes 3D tient 60 images/s dans sa vue web. Si tu
+connais ces API audio, ton aide est bienvenue : voir [CONTRIBUTING.md](CONTRIBUTING.md). Pas de
+version pour Mac Intel aujourd'hui.
 
 **Où sont mes morceaux ?** Dans `~/Music/OpenSmith`, un dossier par morceau (partition, piste
 d'accompagnement, pochette).

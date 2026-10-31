@@ -78,8 +78,11 @@ notes and syncs them to the recording.
 command (see [CONTRIBUTING.md](CONTRIBUTING.md)). Once installed, the app accepts its files like
 MP3s.
 
-**Windows, Linux, Intel Macs?** Not today. The audio engine uses CoreAudio, and the converter
-relies on Apple Silicon to separate stems in reasonable time.
+**Windows, Linux, Intel Macs?** Not yet. Windows and Linux ports are under way; the hard part is
+a latency fit for guitar. Windows' shared audio mode adds 25–40 ms, so the engine needs WASAPI
+exclusive mode or ASIO; Linux needs PipeWire (or JACK) and a check that the 3D highway holds
+60 fps in its web view. If you know these audio APIs, help is welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md). There is no Intel Mac build today.
 
 **Where are my songs?** In `~/Music/OpenSmith`, one folder per song (chart, backing track,
 cover).
