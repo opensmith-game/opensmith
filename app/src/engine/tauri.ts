@@ -176,6 +176,11 @@ export class TauriEngine implements Engine {
     void invoke('set_autopilot', { on });
   }
 
+  /** Records what the guitar plays during songs (takes, to tune the detection offline). */
+  setRecording(on: boolean): void {
+    void invoke('set_recording', { on });
+  }
+
   setTuner(on: boolean): void {
     void invoke('set_tuner', { on });
   }

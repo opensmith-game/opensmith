@@ -64,7 +64,9 @@ export type GameEvent =
   | { type: 'calibrationStart'; first: number; period: number; countIn: number; clicks: number }
   | { type: 'calibrationHit'; index: number; error: number }
   /** Median strum delay to compensate (s) and its spread, from `hits` strums of `total`. */
-  | { type: 'calibrated'; offset: number; spread: number; hits: number; total: number };
+  | { type: 'calibrated'; offset: number; spread: number; hits: number; total: number }
+  /** A take of what the guitar played was saved. */
+  | { type: 'takeSaved'; path: string; seconds: number };
 
 export const emptyScore = (): Score => ({ hits: 0, perfects: 0, misses: 0, extras: 0, streak: 0, bestStreak: 0, points: 0 });
 

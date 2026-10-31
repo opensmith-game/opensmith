@@ -44,6 +44,7 @@ export const MAIN: Record<string, string> = {
   'Langue · Language': 'Language · Langue',
   'Cordes inversées : Mi grave en bas, comme une tablature': 'Inverted strings: low E at the bottom, like a tab',
   'Mode Maître : les notes des phrases maîtrisées s’effacent avant d’arriver, à jouer de mémoire': 'Master mode: notes of mastered phrases fade out before they arrive, to play from memory',
+  'Enregistrer ma guitare pendant les morceaux, pour régler la détection des notes (les prises restent sur ce Mac)': 'Record my guitar during songs, to tune the note detection (takes stay on this Mac)',
   'Décor (hors carrière)': 'Scenery (outside the career)',
   'Guitare (achetées en carrière)': 'Guitar (bought in the career)',
   'Vitesse des notes': 'Note speed',
@@ -245,6 +246,7 @@ export const MAIN: Record<string, string> = {
   'Trop haut': 'Too high',
   'Trop bas': 'Too low',
   'Mauvais accord': 'Wrong chord',
+  'Prise enregistrée': 'Take saved',
 
   // Results: why the notes were missed, the latency left
   'Notes ratées : {list}': 'Missed notes: {list}',

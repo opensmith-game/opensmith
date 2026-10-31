@@ -166,6 +166,9 @@ pub struct Game {
     /// ±`MAX_DRIFT`), learnt from the notes hit: a guitar a little out of tune, or going out of
     /// tune, is still judged right.
     drift: f64,
+    /// Replays: the level each phrase iteration is played at, as in the take (`None`: not
+    /// reached then, so not played now).
+    forced: Option<Vec<Option<u32>>>,
 }
 
 /// Extra time after a chord's hit window for its verification to come back.
@@ -216,6 +219,7 @@ impl Game {
             stray: VecDeque::new(),
             strums: VecDeque::new(),
             drift: 0.0,
+            forced: None,
         }
     }
 
@@ -271,6 +275,12 @@ impl Game {
         self.levels = levels.into_iter().map(|(name, level)| (name, level.min(top))).collect();
     }
 
+    /// Replays a take: each phrase iteration at the level it was played at (`None`: skipped),
+    /// whatever the player does now.
+    pub fn force_levels(&mut self, levels: Vec<Option<u32>>) {
+        self.forced = Some(levels);
+    }
+
     /// Difficulty changed during the song (pause menu): dynamic difficulty from the levels
     /// learnt, or every phrase at `start_level`. The phrases already visible keep their level,
     /// the next ones take the new one.
@@ -303,7 +313,13 @@ impl Game {
         {
             let k = self.next_iteration;
             let phrase = &self.chart.phrases[k];
-            let level = self.level(&phrase.name);
+            let forced = self.forced.as_ref().map(|f| f.get(k).copied().flatten());
+            if forced == Some(None) {
+                self.iterations[k] = Iteration { activated: true, ..Iteration::default() };
+                self.next_iteration += 1;
+                continue;
+            }
+            let level = forced.flatten().unwrap_or_else(|| self.level(&phrase.name));
             let (start, end) = (phrase.start, phrase.end);
             let (from, to) = (self.start_at.max(self.range.0), self.range.1);
             let shown = |levels: [u32; 2], t: f64| {

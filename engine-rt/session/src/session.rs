@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use opensmith_audio::{Monitor, PlayerClock, PlayerCommand, StreamInfo, Track, MAX_RATE, MIN_RATE};
 use opensmith_dsp::{ChainParams, ChordConfig, ChordVerifier, TrackerEvent, TunerAnalyzer, TunerConfig};
@@ -9,6 +11,7 @@ use crate::calibration::{Calibration, CalibrationPlan};
 use crate::events::{UiEvent, UiExpected};
 use serde::Deserialize;
 use crate::history::TapHistory;
+use crate::take::{Recording, Take};
 
 /// Raw input reaches the session in tap blocks: allow for one block of delay (s).
 const TAP_DELAY: f64 = 0.006;
@@ -18,6 +21,8 @@ const ATTACK_MEMORY: f64 = 2.0;
 const SCAN_STEP: f64 = 0.015;
 /// Tuner mode sends the pitch at most this often (s).
 const PITCH_EVERY: f64 = 0.02;
+/// Takes shorter than this are not kept (s).
+const MIN_TAKE: f64 = 10.0;
 
 /// Where a session gets its audio: the CoreAudio engine, or a simulation in tests.
 pub trait AudioBackend {
@@ -96,6 +101,10 @@ pub struct Session<B: AudioBackend> {
     loops_seen: u32,
     /// What was set on the audio engine, applied again to a new one (another output).
     applied: Applied,
+    /// Where takes go (`record`), and the one being recorded.
+    record_to: Option<PathBuf>,
+    recording: Option<Recording>,
+    saving: Vec<JoinHandle<()>>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -140,6 +149,9 @@ impl<B: AudioBackend> Session<B> {
             riff: None,
             loops_seen: 0,
             applied: Applied::default(),
+            record_to: None,
+            recording: None,
+            saving: Vec::new(),
         }
     }
 
@@ -147,6 +159,7 @@ impl<B: AudioBackend> Session<B> {
     /// start over (load again), the guitar settings, amp, volume and speed carry over. Returns
     /// the previous engine, to drop once this one runs.
     pub fn replace_backend(&mut self, backend: B) -> B {
+        self.finish_take();
         let old = std::mem::replace(&mut self.backend, backend);
         self.sample_rate = self.backend.monitor().sample_rate();
         // The new device's input stream counts from zero again.
@@ -200,6 +213,7 @@ impl<B: AudioBackend> Session<B> {
 
     /// Loads a song and its backing track, stopped at song time `start` (negative: count-in).
     pub fn load(&mut self, chart: Chart, track: Option<Track>, start: f64) {
+        self.finish_take();
         let track = track.map(Arc::new);
         if let Some(t) = &track {
             t.set_stem_gain(self.applied.stem);
@@ -220,10 +234,73 @@ impl<B: AudioBackend> Session<B> {
         self.game = Some(game);
         self.calibration = None;
         self.restart_view(start);
+        self.start_take();
+    }
+
+    /// Replays a take: each phrase iteration at the level it was played at (`None`: skipped).
+    pub fn force_levels(&mut self, levels: Vec<Option<u32>>) {
+        if let Some(game) = &mut self.game {
+            game.force_levels(levels);
+        }
+    }
+
+    /// Records what the guitar plays during songs into takes under `base` (one folder per
+    /// play, from a load or a seek to the end, a seek or the next load), to replay them offline;
+    /// `None` stops (the take so far is kept). Loop Trainer passes and slowed-down plays are not
+    /// recorded.
+    pub fn record(&mut self, base: Option<PathBuf>) {
+        if base.is_none() {
+            self.finish_take();
+        }
+        let start = base.is_some() && self.record_to.is_none();
+        self.record_to = base;
+        if start {
+            self.start_take();
+        }
+    }
+
+    fn start_take(&mut self) {
+        if self.record_to.is_some() && self.game.is_some() && self.riff.is_none() && !self.autopilot {
+            self.recording = Some(Recording::default());
+        }
+    }
+
+    /// Saves the take being recorded (on another thread), if long enough.
+    fn finish_take(&mut self) {
+        let (Some(rec), Some(base), Some(game)) = (self.recording.take(), self.record_to.clone(), self.game.as_ref()) else { return };
+        let sr = self.sample_rate;
+        if (rec.guitar.len() as f64) < MIN_TAKE * sr {
+            return;
+        }
+        let take = Take {
+            chart: game.chart().clone(),
+            sample_rate: sr as u32,
+            guitar: rec.guitar,
+            anchors: rec.anchors,
+            input_offset: self.cfg.game.input_offset,
+            levels: (0..game.chart().phrases.len()).map(|k| game.iteration_level(k)).collect(),
+            score: game.score().into(),
+        };
+        let dir = take.folder_in(&base);
+        self.events.push(UiEvent::TakeSaved { path: dir.display().to_string(), seconds: take.seconds() });
+        self.saving.retain(|h| !h.is_finished());
+        self.saving.push(std::thread::spawn(move || {
+            if let Err(e) = take.save(&dir) {
+                eprintln!("prise non enregistrée : {e}");
+            }
+        }));
+    }
+
+    /// Waits for the takes being written.
+    pub fn wait_takes(&mut self) {
+        for h in self.saving.drain(..) {
+            let _ = h.join();
+        }
     }
 
     /// Plays the click track of `plan` and measures how late the player's strums come.
     pub fn calibrate(&mut self, plan: CalibrationPlan) {
+        self.finish_take();
         let track = Arc::new(plan.track(self.sample_rate as u32));
         self.tracks.push(track.clone());
         self.has_track = true;
@@ -255,6 +332,9 @@ impl<B: AudioBackend> Session<B> {
     /// Demo mode: the game plays every note itself, on time (the guitar is still heard).
     pub fn set_autopilot(&mut self, on: bool) {
         self.autopilot = on;
+        if on {
+            self.recording = None; // the autopilot's notes are not the player's
+        }
     }
 
     pub fn set_tuner(&mut self, on: bool) {
@@ -316,6 +396,7 @@ impl<B: AudioBackend> Session<B> {
 
     /// Moves to song time `t`: judging starts over from there, phrase levels are kept.
     pub fn seek(&mut self, t: f64) {
+        self.finish_take();
         self.generation = self.generation.wrapping_add(1);
         self.loops_seen = 0;
         let frame = self.frame_of(t);
@@ -324,6 +405,7 @@ impl<B: AudioBackend> Session<B> {
             game.restart_at(t);
         }
         self.restart_view(t);
+        self.start_take();
     }
 
     /// Playback speed (1: as recorded), the pitch unchanged: the song clock, the notes and the
@@ -340,6 +422,9 @@ impl<B: AudioBackend> Session<B> {
     /// Loop Trainer on (`Some`: plays the loop from its start, a `Pass` event each time it goes
     /// back) or off (`None`: plays on from where it is, every note judged from the next seek).
     pub fn set_riff(&mut self, riff: Option<RiffLoop>) {
+        if riff.is_some() {
+            self.finish_take();
+        }
         self.riff = riff;
         let frames = riff.map(|r| (self.frame_of(r.start), self.frame_of(r.end)));
         self.backend.monitor().send(PlayerCommand::Loop(frames));
@@ -413,7 +498,13 @@ impl<B: AudioBackend> Session<B> {
         self.tracks.retain(|t| Arc::strong_count(t) > 1);
         let (sr, offset) = (self.sample_rate, self.offset);
         let history = &mut self.history;
-        self.backend.monitor().drain_tap(|b| history.push(b.first, b.samples()));
+        let recording = &mut self.recording;
+        self.backend.monitor().drain_tap(|b| {
+            history.push(b.first, b.samples());
+            if let Some(r) = recording.as_mut() {
+                r.pending.push((b.first, b.samples().to_vec()));
+            }
+        });
         let mut onsets = Vec::new();
         let mut notes = Vec::new();
         self.backend.monitor().poll_events(|e| match e {
@@ -430,7 +521,12 @@ impl<B: AudioBackend> Session<B> {
             }
         }
         // Until the player applied the last load or seek, what was heard belongs to the past.
-        let Some(clock) = self.synced_clock() else { return };
+        let Some(clock) = self.synced_clock() else {
+            if let Some(r) = &mut self.recording {
+                r.pending.clear();
+            }
+            return;
+        };
         if clock.loops != self.loops_seen {
             self.loops_seen = clock.loops;
             self.next_pass();
@@ -438,6 +534,15 @@ impl<B: AudioBackend> Session<B> {
         let now = clock.time_at(self.backend.now_ns() as f64, sr) - offset;
         let monitor = self.backend.monitor();
         let song = |m: &Monitor, sample: u64| m.input_time_ns(sample as f64).map(|h| clock.time_at(h, sr) - offset);
+        if let Some(r) = &mut self.recording {
+            // Only the song played as recorded: not paused, not slowed down.
+            let live = clock.playing && self.rate == 1.0;
+            for (first, samples) in std::mem::take(&mut r.pending) {
+                if let Some(t) = song(monitor, first).filter(|_| live) {
+                    r.add(t, &samples, sr);
+                }
+            }
+        }
         let strums: Vec<f64> = onsets.iter().filter_map(|&s| song(monitor, s)).collect();
         self.attacks.extend(strums.iter().copied());
         while self.attacks.front().is_some_and(|&t| t < now - ATTACK_MEMORY) {
@@ -529,6 +634,7 @@ impl<B: AudioBackend> Session<B> {
         if finished && !self.ended {
             self.ended = true;
             self.events.push(UiEvent::End);
+            self.finish_take();
         }
     }
 
@@ -559,6 +665,14 @@ impl<B: AudioBackend> Session<B> {
     fn synced_clock(&mut self) -> Option<PlayerClock> {
         let c = self.backend.monitor().clock();
         (c.valid && c.generation == self.generation).then_some(c)
+    }
+}
+
+impl<B: AudioBackend> Drop for Session<B> {
+    /// The take being recorded is kept, and written before the session goes.
+    fn drop(&mut self) {
+        self.finish_take();
+        self.wait_takes();
     }
 }
 

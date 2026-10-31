@@ -9,7 +9,8 @@ use std::sync::Arc;
 use opensmith_audio::{Bridge, EngineConfig, InputSide, Monitor, OutputSide, Track};
 use opensmith_dsp::synth::{mix_into, Pcg32, Pluck};
 use opensmith_game::{Chart, Game, GameConfig, Target};
-use opensmith_session::{AudioBackend, CalibrationPlan, RiffLoop, Session, SessionConfig, UiEvent, UiScore, UiTarget};
+use opensmith_session::replay::{replay, Report};
+use opensmith_session::{AudioBackend, CalibrationPlan, RiffLoop, Session, SessionConfig, Take, UiEvent, UiScore, UiTarget};
 
 const SR: f64 = 48_000.0;
 const BLOCK: usize = 64;
@@ -390,6 +391,45 @@ fn the_calibrated_offset_centres_a_late_player() {
     let mean = o.hits.iter().map(|h| h.0).sum::<f64>() / o.hits.len() as f64;
     assert!(mean.abs() < 0.005, "mean error {mean} after compensating {late}");
     assert!(o.hits.iter().filter(|h| h.1).count() as f64 > 0.8 * o.hits.len() as f64, "perfect again once compensated");
+}
+
+#[test]
+fn a_take_replayed_offline_is_judged_as_it_was_live() {
+    // A sloppy player: 30 ms late, every fifth note skipped, every seventh a semitone high.
+    let chart = chart();
+    let mut guitar = vec![0.0f32; input_index(heard_at(chart.meta.duration + 1.0))];
+    let mut game = Game::new(chart.clone(), config().game);
+    game.activate_all();
+    let times: Vec<f64> = game.expected().iter().map(|e| e.time).collect();
+    let nth = |t: f64| times.iter().position(|&x| x == t).unwrap_or(0);
+    play_into(&mut guitar, &chart, |t| nth(t) % 5 != 4 && nth(t) % 7 != 6, |t| heard_at(t) + 0.03);
+    let mut wrong = chart.clone();
+    for n in wrong.notes.iter_mut() {
+        n.fret += 1;
+    }
+    wrong.chords.clear();
+    play_into(&mut guitar, &wrong, |t| nth(t) % 7 == 6, |t| heard_at(t) + 0.03);
+
+    let dir = std::env::temp_dir().join(format!("opensmith-takes-{}", std::process::id()));
+    let mut rig = Rig::new(guitar);
+    rig.session.record(Some(dir.clone()));
+    rig.session.load(chart.clone(), Some(silent_track(chart.meta.duration)), -COUNT_IN);
+    rig.session.play();
+    rig.run(heard_at(chart.meta.duration) + 1.0);
+    rig.session.wait_takes();
+    let live = Report::of(&rig.events);
+    let saved = rig.events.iter().find_map(|e| if let UiEvent::TakeSaved { path, .. } = e { Some(path.clone()) } else { None });
+    let take = Take::load(std::path::Path::new(&saved.expect("a take saved at the end of the song"))).unwrap();
+    assert!((take.seconds() - chart.meta.duration).abs() < 1.5, "{} s", take.seconds());
+    assert_eq!(take.score.hits as usize, live.hits());
+
+    let again = Report::of(&replay(&take, &EngineConfig::default(), config()));
+    println!("live   {live}\nreplay {again}");
+    assert!(live.hits() > 20 && live.unplayed > 5 && live.high > 3, "a mixed performance: {live}");
+    assert_eq!(again.judged(), live.judged(), "the same notes judged");
+    assert!(again.hits().abs_diff(live.hits()) <= 1, "{} hits replayed, {} live", again.hits(), live.hits());
+    assert!((again.mean_error - live.mean_error).abs() < 0.003, "timing {} vs {}", again.mean_error, live.mean_error);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]

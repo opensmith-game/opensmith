@@ -35,6 +35,8 @@ pub enum UiEvent {
     CalibrationHit { index: usize, error: f64 },
     /// Median strum delay (the latency to compensate) and its spread, from `hits` of `total`.
     Calibrated { offset: f64, spread: f64, hits: usize, total: usize },
+    /// A take of what the guitar played was saved to `path` (`seconds` long).
+    TakeSaved { path: String, seconds: f64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

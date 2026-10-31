@@ -74,6 +74,8 @@ pub enum Command {
     Input(Option<String>),
     /// Demo mode: the game plays every note itself.
     Autopilot(bool),
+    /// Records what the guitar plays during songs into takes under this folder (`None`: stop).
+    Record(Option<std::path::PathBuf>),
 }
 
 /// The devices a backend is built on: name fragments, `None` for the automatic choice.
@@ -237,6 +239,7 @@ where
                     }
                 }
                 Ok(Command::Autopilot(on)) => session.set_autopilot(on),
+                Ok(Command::Record(base)) => session.record(base),
                 Ok(Command::MonitorGain(g)) => session.set_monitor_gain(g),
                 Ok(Command::Rate(r)) => session.set_rate(r),
                 Ok(Command::Riff(riff)) => session.set_riff(riff),

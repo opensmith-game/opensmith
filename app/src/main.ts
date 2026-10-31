@@ -91,6 +91,8 @@ interface Settings extends GuitarValues {
   riffAccelerate: boolean;
   /** Mastered phrases fade out on their way to the strike line. */
   masterMode: boolean;
+  /** Takes of what the guitar plays during songs, to tune the detection. */
+  recordTakes: boolean;
   /** The place behind the highway outside the career (whose gigs bring their own). */
   scenery: SceneryId;
   /** The guitar's sound, in free play and in songs. */
@@ -107,6 +109,7 @@ const DEFAULTS: Settings = {
   riffSpeed: 0.75,
   riffAccelerate: true,
   masterMode: true,
+  recordTakes: false,
   scenery: 'concert',
   amp: DEFAULT_AMP,
   autopilot: false,
@@ -1599,6 +1602,7 @@ function syncSettings(): void {
   }
   field<HTMLInputElement>('invertStrings').checked = settings.invertStrings;
   field<HTMLInputElement>('masterMode').checked = settings.masterMode;
+  field<HTMLInputElement>('recordTakes').checked = settings.recordTakes;
   field<HTMLSelectElement>('scenery').value = settings.scenery;
   if (!gig) highway.setScenery(settings.scenery);
   field<HTMLSelectElement>('speed').value = String(settings.speed);
@@ -1613,6 +1617,10 @@ form.addEventListener('input', (e) => {
   if (e.target === langSelect) return;
   settings.invertStrings = field<HTMLInputElement>('invertStrings').checked;
   settings.masterMode = field<HTMLInputElement>('masterMode').checked;
+  if (settings.recordTakes !== field<HTMLInputElement>('recordTakes').checked) {
+    settings.recordTakes = !settings.recordTakes;
+    if (engine instanceof TauriEngine) engine.setRecording(settings.recordTakes);
+  }
   const scenery = field<HTMLSelectElement>('scenery').value;
   if (isScenery(scenery)) settings.scenery = scenery;
   settings.speed = Number(field<HTMLSelectElement>('speed').value);
@@ -1766,6 +1774,9 @@ function frame(ms: number): void {
       backlog = [];
     }
     view.apply(f.events, f.time);
+    for (const e of f.events) {
+      if (e.type === 'takeSaved') hud.toast({ kind: 'phrase', title: t('Prise enregistrée'), detail: formatTime(e.seconds) });
+    }
     for (const t of view.drainToasts()) hud.toast(t);
     for (const p of view.drainPasses()) onPass(p);
     for (const p of view.drainPhrases()) onAttackPhrase(p);
@@ -1815,6 +1826,7 @@ if (engine instanceof TauriEngine) {
   document.body.classList.add('live');
   engine.configureAmp(settings.amp);
   engine.setAutopilot(settings.autopilot);
+  if (engine instanceof TauriEngine) engine.setRecording(settings.recordTakes);
   hwHud.setAutopilot(settings.autopilot);
   // The hardware strip follows the engine: input, connection, latency.
   const watchAudio = () => {

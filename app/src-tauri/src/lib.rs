@@ -704,6 +704,13 @@ fn set_autopilot(app: State<'_, App>, on: bool) {
     app.session.send(Command::Autopilot(on));
 }
 
+/// Takes of what the guitar plays during songs, in the library's hidden `.takes` folder: to
+/// replay them offline and tune the detection (`opensmith-replay`). They stay on this Mac.
+#[tauri::command]
+fn set_recording(app: State<'_, App>, on: bool) {
+    app.session.send(Command::Record(on.then(|| app.library.join(".takes"))));
+}
+
 /// Tuner mode: the pitch of the ringing string streams in the poll events.
 #[tauri::command]
 fn set_tuner(app: State<'_, App>, on: bool) {
@@ -857,6 +864,7 @@ pub fn run() {
             audio_inputs,
             set_input,
             set_autopilot,
+            set_recording,
             set_difficulty,
             set_tuner,
             calibrate_latency,
